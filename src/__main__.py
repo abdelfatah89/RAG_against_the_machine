@@ -4,6 +4,7 @@ import numpy as np
 from fire import Fire
 from .cli import CLI
 from sentence_transformers import SentenceTransformer
+from .markdown_chunker import MarkdownChunker
 
 def main() -> None:
     # Setup
@@ -12,16 +13,16 @@ def main() -> None:
     collection = client.create_collection("policies")
     # Add 3 policy documents (Chroma handles embeddings automatically)
     policies = [
-    "Dogs are allowed in the office on Fridays",
-    "Pets can come to work on Furry Fridays",
-    "Remote work policy allows 3 days from home"
+        "Dogs are allowed in the office on Fridays",
+        "Pets can come to work on Furry Fridays",
+        "Remote work policy allows 3 days from home"
     ]
-    for i, policy in enumerate (policies):
+    for i, policy in enumerate(policies):
         collection.add(
                 documents=[policy],
                 ids=[f"policy_{i}"]
                 )
-    #Query the system
+    # Query the system
     query = "Can I bring my dog to work?"
     policies.append(query)
     embeddings = model.encode(policies)
@@ -33,5 +34,9 @@ def main() -> None:
     print(sim_q2)
     print(results['distances'])
 
+
 if __name__ == "__main__":
-    Fire(CLI)
+    cunk = MarkdownChunker()
+    cunk.checker("test.md")
+    for b in cunk.blocks:
+        print(b)
