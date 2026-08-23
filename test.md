@@ -1,9 +1,131 @@
-# The Evolution of Human Civilization
+from langchain_text_splitters import (
+    RecursiveCharacterTextSplitter, MarkdownHeaderTextSplitter)
+from .models import MinimalSource
+from typing import List
+from abc import ABC
+from pathlib import Path
+from typing import Tuple
 
-Human civilization is a complex and fascinating journey that spans thousands of years, marked by remarkable innovations, cultural shifts, and societal transformations. From the humble beginnings of our early ancestors to the highly interconnected digital world of today, the story of humanity is one of resilience, curiosity, and constant evolution.
 
-## Early Human History
+SUPPORTED_EXTENSIONS = {".py", ".md", ".txt"}
 
-The story begins in Africa, where the earliest known human ancestors, such as *Homo habilis* and *Australopithecus*, emerged approximately 4 to 2 million years ago. These early hominins relied on basic stone tools and lived as nomadic hunter-gatherers. Over time, they developed more sophisticated tools, harnessed fire, and began to form social groups, laying the foundation for future civilizations.
 
-The **Paleolithic Era**, or Old Stone Age, saw humans expanding across continents, adapting to diverse environments. The discovery of fire was a crucial milestone, providing warmth, protection, and a means to cook food, which in turn supported brain development. During this period, humans also created rudimentary art, such as cave paintings, and developed early religious beliefs.
+class Chunk(MinimalSource):
+    def __init__(self, file_path: str, first_character_index: int,
+                 last_character_index: int, content: str, file_type: str,
+                 metadata: dict = dict()):
+        super().__init__(
+            file_path=file_path,
+            first_character_index=first_character_index,
+            last_character_index=last_character_index,
+            content=content,
+            file_type=file_type,
+            metadata=metadata
+        )
+
+
+class Chunker(ABC):
+    def __init__(self):
+        self.max_chunk_size = 2000
+
+    def chunk(self, content: str) -> List[Chunk]:
+        return []
+
+
+class PythonChunker(Chunker):
+    def chunk(self, path: str) -> List[Chunk]:
+        search_from = 0
+        with open(path, "r") as f:
+            content = f.read()
+
+        return []
+
+
+class MarkdownChunker(Chunker):
+    def chunk(self, path: str) -> List[Chunk]:
+        search_from = 0
+        chunk_objects = []
+        with open(path, "r") as f:
+            content = f.read()
+        headers_to_split_on = [
+            ("#", "h1"),
+            ("##", "h2"),
+            ("###", "h3"),
+            ("####", "h4"),
+        ]
+
+        splitter = MarkdownHeaderTextSplitter(
+            headers_to_split_on=headers_to_split_on
+        )
+
+        chunks = splitter.split_text(content)
+        for chunk in chunks:
+            start = content.find(f"{chunk.page_content}", search_from)
+            end = start + len(chunk.page_content)
+            chunk_obj = Chunk(path, start, end,
+                              chunk.page_content, "md", chunk.metadata)
+            search_from = end
+            chunk_objects.append(chunk_obj)
+
+        return chunk_objects
+
+
+class TextChunker(Chunker):
+    def chunk(self, path: str) -> List[Chunk]:
+        search_from = 0
+        chunk_objects = []
+
+        with open(path, "r") as f:
+            content = f.read()
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=self.max_chunk_size,
+            chunk_overlap=self.max_chunk_size // 10,
+        )
+
+        chunks = splitter.split_text(content)
+        for chunk in chunks:
+            start = content.find(chunk, search_from)
+            end = start + len(chunk)
+            chunk_obj = Chunk(path, start, end, chunk, "txt")
+            chunk_objects.append(chunk_obj)
+        return chunk_objects
+
+
+class ChunksFactory:
+    def __init__(self):
+        self.py_chunker = PythonChunker()
+        self.md_chunker = MarkdownChunker()
+        self.txt_chunker = TextChunker()
+
+    def get_files(self, data_dir: str
+                  ) -> Tuple[List[Path], List[Path], List[Path]]:
+        root = Path(data_dir)
+
+        py_files = []
+        md_files = []
+        txt_files = []
+        for path in root.rglob("*"):
+            if (path.is_file() and
+                    path.suffix.lower() not in SUPPORTED_EXTENSIONS):
+                continue
+            if path.is_file() and path.suffix.lower() == ".py":
+                py_files.append(path)
+            elif path.is_file() and path.suffix.lower() == ".md":
+                md_files.append(path)
+            elif path.is_file() and path.suffix.lower() == ".txt":
+                txt_files.append(path)
+
+        return py_files, md_files, txt_files
+
+    def get_chunks(self, data_dir: str
+                   ) -> Tuple[List[Chunk], List[Chunk], List[Chunk]]:
+        py_files, md_files, txt_files = self.get_files(data_dir)
+
+        for file in py_files:
+            py_chunks = self.py_chunker.chunk(file)
+        for file in md_files:
+            md_chunks = self.md_chunker.chunk(file)
+        for file in txt_files:
+            txt_chunks = self.txt_chunker.chunk(file)
+
+        return py_chunks, md_chunks, txt_chunks
