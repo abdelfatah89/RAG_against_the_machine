@@ -7,9 +7,10 @@ class MinimalSource(BaseModel):
     file_path: str
     first_character_index: int
     last_character_index: int
-    content: str
-    file_type: str
-    metadata: dict = Field(default_factory=dict)
+    content: str = ""
+    file_type: str = ""
+    metadata: dict = {}
+    score: float = 0.0
 
 
 class UnansweredQuestion(BaseModel):

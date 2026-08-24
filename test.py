@@ -1,44 +1,31 @@
-from langchain_text_splitters import (
-    RecursiveCharacterTextSplitter,
-    Language,
+from rank_bm25 import BM25Okapi
+
+documents = [
+    "Python is a programming language",
+    "Java is used for enterprise applications",
+    "Python can be used for machine learning",
+]
+
+tokenized_docs = [doc.lower().split() for doc in documents]
+
+bm25 = BM25Okapi(tokenized_docs)
+
+query = "Python machine learning"
+scores = bm25.get_scores(query.lower().split())
+
+
+doc_scores = list(zip(documents, scores.tolist()))
+doc_scores.sort(key=lambda x: x[1], reverse=True)
+for d in doc_scores:
+    print(f"{d[0]} : {d[1]}")
+
+print(documents)
+print(scores.tolist())
+
+top_k = bm25.get_top_n(
+    query.lower().split(),
+    documents,
+    n=2,
 )
-import ast
 
-splitter = RecursiveCharacterTextSplitter.from_language(
-    language=Language.PYTHON,
-    chunk_size=1000,
-    chunk_overlap=100,
-)
-
-def get_offsets(source: str, node: ast.AST) -> tuple[int, int]:
-    lines = source.splitlines(keepends=True)
-
-    start = sum(len(line) for line in lines[:node.lineno - 1])
-    start += node.col_offset
-
-    end = sum(len(line) for line in lines[:node.end_lineno - 1])
-    end += node.end_col_offset
-
-    return start, end
-
-with open("test.md", "r") as f:
-    python_code = f.read()
-
-print(python_code.find("class Chunk(MinimalSource):"))
-
-tree = ast.parse(python_code)
-for node in tree.body:
-    if isinstance(node, (ast.ClassDef, ast.FunctionDef)):
-        start, end = get_offsets(python_code, node)
-
-        print(node.name)
-        print("start:", start)
-        print("end:", end)
-        # print("source:", repr(python_code[start:end]))
-
-chunks = splitter.split_text(python_code)
-
-# print(f"Number of chunks: {len(chunks)}")
-# print("Chunks:")
-# for i, chunk in enumerate(chunks):
-#     print(f"Chunk {i + 1}:\n{chunk}\n{'-' * 40}")
+# print(top_k)
