@@ -1,27 +1,43 @@
-from .retrieval import RetrievalFactory
-from .models import MinimalSource
+from typing import Dict, List, Tuple
+
 from .chunker import Chunk
-from typing import List
+from .models import MinimalSource
+from .retrieval import BM25Retrieval, EmbeddingRetrieval, RetrievalFactory
 
 
 class HybridSearch:
     def __init__(self, chunks: List[Chunk]):
-        self.retrieval_factory = RetrievalFactory()
         self.chunks = chunks
+        self.bm25 = BM25Retrieval(chunks)
+        self.embedding = EmbeddingRetrieval(chunks)
+
         self.bm25_results: List[MinimalSource] = []
         self.embedding_results: List[MinimalSource] = []
 
     def generate_results(self, query: str, k: int = 3) -> None:
-        bm25_results = self.retrieval_factory.create_retrieval(
-            "bm25", self.chunks, query, k)
+        self.bm25_results = self.bm25.retrieve(query, k)
+        self.embedding_results = self.embedding.retrieve(query, k)
 
-        embedding_results = self.retrieval_factory.create_retrieval(
-            "embedding", self.chunks, query, k)
+    @staticmethod
+    def _key(result: MinimalSource) -> Tuple[str, int, int]:
+        return (
+            result.file_path,
+            result.first_character_index,
+            result.last_character_index,
+        )
 
-        self.bm25_results = bm25_results
-        self.embedding_results = embedding_results
+    @staticmethod
+    def _normalize(results: List[MinimalSource]
+                   ) -> Dict[Tuple[str, int, int], float]:
+        if not results:
+            return {}
 
-        return
+        scored = {HybridSearch._key(r): r.score for r in results}
+        lo = min(scored.values())
+        hi = max(scored.values())
+        span = (hi - lo) or 1.0
+
+        return {key: (score - lo) / span for key, score in scored.items()}
 
     def search(self, query: str, k: int = 3,
                bm25_factor: float = 0.3,
@@ -29,26 +45,41 @@ class HybridSearch:
                ) -> List[MinimalSource]:
 
         self.generate_results(query, k)
-        hybrid_results = []
-        for result in self.bm25_results:
-            if result in self.embedding_results:
-                index = self.embedding_results.index(result)
-                hybrid_score = (
-                    (bm25_factor * result.score) +
-                    (embedding_factor * self.embedding_results[index].score)
-                    )
-                result.score = hybrid_score
-                hybrid_results.append(result)
-            else:
-                hybrid_results.append(result)
 
-        hybrid_results.sort(key=lambda x: x.score, reverse=True)
-        if len(hybrid_results) > k:
-            hybrid_results = hybrid_results[:k]
+        bm25_by_key = {self._key(r): r for r in self.bm25_results}
+        embedding_by_key = {self._key(r): r for r in self.embedding_results}
 
-        hybrid_json = [item.model_dump_json() for item in hybrid_results]
-        with open("hybrid_processed_data.json", "w") as f:
-            import json
-            json.dump(hybrid_json, f, indent=4)
+        bm25_norm = self._normalize(self.bm25_results)
+        embedding_norm = self._normalize(self.embedding_results)
+
+        all_keys = set(bm25_by_key) | set(embedding_by_key)
+
+        hybrid_results: List[MinimalSource] = []
+        for key in all_keys:
+            base = bm25_by_key.get(key) or embedding_by_key.get(key)
+            assert base is not None
+
+            bm25_score = bm25_norm.get(key, 0.0)
+            embedding_score = embedding_norm.get(key, 0.0)
+            hybrid_score = (
+                (bm25_factor * bm25_score) +
+                (embedding_factor * embedding_score)
+            )
+
+            hybrid_results.append(
+                base.model_copy(update={"score": hybrid_score})
+            )
+
+        hybrid_results.sort(key=lambda r: r.score, reverse=True)
+        hybrid_results = hybrid_results[:k]
+
+        self.save_processed_data(
+            hybrid_results, "data/processed/hybrid_processed_data.json")
 
         return hybrid_results
+
+    def save_processed_data(self,
+                            data: List[MinimalSource],
+                            file_path: str
+                            ) -> None:
+        RetrievalFactory().save_processed_data(data, file_path)

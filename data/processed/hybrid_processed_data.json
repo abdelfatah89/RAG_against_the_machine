@@ -1,0 +1,29 @@
+[
+    {
+        "file_path": "data/raw/vllm-0.10.1/examples/online_serving/openai_chat_completion_with_reasoning.py",
+        "first_character_index": 107,
+        "last_character_index": 511,
+        "content": "\"\"\"\nAn example shows how to generate chat completions from reasoning models\nlike DeepSeekR1.\n\nTo run this example, you need to start the vLLM server\nwith the reasoning parser:\n\n```bash\nvllm serve deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B \\\n    --reasoning-parser deepseek_r1\n```\n\nThis example demonstrates how to generate chat completions from reasoning models\nusing the OpenAI Python client library.\n\"\"\"",
+        "file_type": "py",
+        "metadata": {},
+        "score": 0.3
+    },
+    {
+        "file_path": "data/raw/vllm-0.10.1/examples/online_serving/openai_transcription_client.py",
+        "first_character_index": 107,
+        "last_character_index": 612,
+        "content": "\"\"\"\nThis script demonstrates how to use the vLLM API server to perform audio\ntranscription with the `openai/whisper-large-v3` model.\n\nBefore running this script, you must start the vLLM server with the following command:\n\n    vllm serve openai/whisper-large-v3\n\nRequirements:\n- vLLM with audio support\n- openai Python SDK\n- httpx for streaming support\n\nThe script performs:\n1. Synchronous transcription using OpenAI-compatible API.\n2. Streaming transcription using raw HTTP request to the vLLM server.\n\"\"\"",
+        "file_type": "py",
+        "metadata": {},
+        "score": 0.0030485833199719215
+    },
+    {
+        "file_path": "data/raw/vllm-0.10.1/examples/online_serving/openai_embedding_client.py",
+        "first_character_index": 108,
+        "last_character_index": 133,
+        "content": "from openai import OpenAI",
+        "file_type": "py",
+        "metadata": {},
+        "score": 0.0
+    }
+]
