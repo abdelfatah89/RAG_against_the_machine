@@ -6,3 +6,5 @@ vllm-0.10.1/
 .__pycache__/
 .pytest_cache/
 *.pyc
+chromadb/
+data/processed/*
