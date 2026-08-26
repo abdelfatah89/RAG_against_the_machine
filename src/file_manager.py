@@ -1,69 +1,70 @@
 from pathlib import Path
 import hashlib
 import json
-from typing import List
+from typing import Dict, List
 
 
 SUPPORTED_EXTENSIONS = {".py", ".md", ".txt"}
+HASHES_PATH = Path("data/processed/file_hashes.json")
 
 
 class FileManager:
     def __init__(self, data_dir: str):
         self.data_dir = data_dir
-        self.generate_file_hashes()
 
     def get_file_hash(self, path: Path) -> str:
         return hashlib.sha256(path.read_bytes()).hexdigest()
 
     def get_files(self) -> List[str]:
-        data_dir = self.data_dir
-        root = Path(data_dir)
+        root = Path(self.data_dir)
         files = []
         for path in root.rglob("*"):
-            if (path.is_file() and
-                    path.suffix.lower() not in SUPPORTED_EXTENSIONS):
-                continue
-            if (path.is_file() and
-                (path.suffix.lower() == ".py" or
-                 path.suffix.lower() == ".md" or
-                 path.suffix.lower() == ".txt")):
+            if path.is_file() and path.suffix.lower() in SUPPORTED_EXTENSIONS:
                 files.append(str(path))
         return files
 
-    def generate_file_hashes(self) -> None:
-        files = self.get_files()
-        file_hashes = {}
-        for path in files:
+    def get_current_hashes(self) -> Dict[str, str]:
+        """Hash every currently-present supported file. Does NOT persist."""
+        current_hashes: Dict[str, str] = {}
+        for path in self.get_files():
             file_path = Path(path)
-            if file_path.is_file():
-                file_hashes[str(file_path)] = self.get_file_hash(file_path)
-        with open("data/processed/file_hashes.json", "w") as f:
-            json.dump(file_hashes, f, indent=4)
+            current_hashes[str(file_path)] = self.get_file_hash(file_path)
+        return current_hashes
 
-    def get_old_hashes(self) -> dict[str, str]:
-        old_hashes_path = Path("data/processed/file_hashes.json")
-        if old_hashes_path.is_file():
-            with open(old_hashes_path, "r") as f:
+    def save_hashes(self, hashes: Dict[str, str]) -> None:
+        """Persist the given hash map as the new baseline for next run."""
+        HASHES_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with open(HASHES_PATH, "w") as f:
+            json.dump(hashes, f, indent=4)
+
+    def get_old_hashes(self) -> Dict[str, str]:
+        if HASHES_PATH.is_file():
+            with open(HASHES_PATH, "r") as f:
                 return json.load(f)
         return {}
 
     def get_modified_files(self) -> List[str]:
-        modified = []
+        """Files that are new or whose content changed since the last
+        persisted baseline. Does not include deleted files -- see
+        get_deleted_files()."""
         old_hashes = self.get_old_hashes()
+        current_hashes = self.get_current_hashes()
+
         if not old_hashes:
-            return self.get_files()
-        files = self.get_files()
+            return list(current_hashes.keys())
 
-        for path in files:
-            file_path = Path(path)
-            if not file_path.is_file():
-                continue
+        return [
+            path for path, current_hash in current_hashes.items()
+            if old_hashes.get(path) != current_hash
+        ]
 
-            key = str(file_path)
-            current_hash = self.get_file_hash(file_path)
+    def get_deleted_files(self) -> List[str]:
+        """Files present in the last baseline but no longer on disk."""
+        old_hashes = self.get_old_hashes()
+        current_files = set(self.get_files())
+        return [path for path in old_hashes if path not in current_files]
 
-            # New file OR content changed
-            if old_hashes.get(key) != current_hash:
-                modified.append(str(file_path))
-
-        return modified
+    def modified_files_exist(self) -> bool:
+        if not self.get_old_hashes():
+            return True
+        return bool(self.get_modified_files() or self.get_deleted_files())

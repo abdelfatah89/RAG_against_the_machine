@@ -1,8 +1,7 @@
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 from abc import ABC, abstractmethod
 from pathlib import Path
 import ast
-import json
 from tqdm import tqdm  # type: ignore[import-untyped]
 
 from langchain_text_splitters import (
@@ -217,45 +216,39 @@ class TextChunker(Chunker):
 
 
 class ChunksFactory:
-    def __init__(self, max_chunk_size: int = 2000):
+    def __init__(self,
+                 data_dir: str = "data/raw",
+                 max_chunk_size: int = 2000):
+        self.data_dir = data_dir
+        self.file_manager = FileManager(data_dir)
         self.py_chunker = PythonChunker(max_chunk_size=max_chunk_size)
         self.md_chunker = MarkdownChunker(max_chunk_size=max_chunk_size)
         self.txt_chunker = TextChunker(max_chunk_size=max_chunk_size)
 
-    def get_files(self, data_dir: str
-                  ) -> Tuple[List[str], List[str], List[str]]:
-        files = FileManager(data_dir).get_modified_files()
-        py_files = []
-        md_files = []
-        txt_files = []
+    def get_files(self) -> Tuple[List[str], List[str], List[str]]:
+        # FileManager.get_files() already filters to SUPPORTED_EXTENSIONS,
+        # no need to re-check suffixes against it here.
+        files = self.file_manager.get_files()
+        py_files: List[str] = []
+        md_files: List[str] = []
+        txt_files: List[str] = []
         for path in files:
             file_path = Path(path)
-            if (file_path.is_file() and
-                    file_path.suffix.lower() not in SUPPORTED_EXTENSIONS):
-                continue
-            if file_path.is_file() and file_path.suffix.lower() == ".py":
+            suffix = file_path.suffix.lower()
+            if suffix == ".py":
                 py_files.append(str(file_path))
-            elif file_path.is_file() and file_path.suffix.lower() == ".md":
+            elif suffix == ".md":
                 md_files.append(str(file_path))
-            elif file_path.is_file() and file_path.suffix.lower() == ".txt":
+            elif suffix == ".txt":
                 txt_files.append(str(file_path))
 
         return py_files, md_files, txt_files
 
-    def get_chunks(self, data_dir: str) -> List[Chunk]:
-        processed_data = Path("data/processed/processed_chunks.json")
-        if processed_data.is_file():
-            with open(processed_data, "r") as f:
-                data = json.load(f)
-            chunks = [Chunk(**item) for item in data]
-            print(f"Loaded {len(chunks)} chunks from"
-                  " data/processed/processed_chunks.json")
-            return chunks
-
-        py_files, md_files, txt_files = self.get_files(data_dir)
-        py_chunks = []
-        md_chunks = []
-        txt_chunks = []
+    def get_chunks(self) -> List[Chunk]:
+        py_files, md_files, txt_files = self.get_files()
+        py_chunks: List[Chunk] = []
+        md_chunks: List[Chunk] = []
+        txt_chunks: List[Chunk] = []
 
         for file in py_files:
             py_chunks += self.py_chunker.chunk(file)
@@ -266,20 +259,23 @@ class ChunksFactory:
 
         chunks = py_chunks + md_chunks + txt_chunks
         chunks.sort(key=lambda x: x.file_type)
+
         for _ in tqdm(range(len(chunks)), desc="Chunking", unit="chunk"):
             continue
 
-        output_data: List[Dict] = []
-        progress = tqdm(
-            desc="Tokenizing", unit="chunk", total=len(chunks))
-        for chunk in chunks:
-            my_dict = chunk.model_dump()
-            output_data.append(my_dict)
-            progress.update(1)
-        progress.close()
-
-        with open("data/processed/processed_chunks.json", "w") as f:
-            json.dump(output_data, f, indent=4)
-        print(f"Ingestion complete! Indexed {len(chunks)}"
-              " chunks under data/processed/")
         return chunks
+
+    def get_modified_chunks(self) -> List[Chunk]:
+        modified_files = self.file_manager.get_modified_files()
+        modified_chunks: List[Chunk] = []
+        for file in modified_files:
+            file_path = Path(file)
+            suffix = file_path.suffix.lower()
+            if suffix == ".py":
+                modified_chunks += self.py_chunker.chunk(file)
+            elif suffix == ".md":
+                modified_chunks += self.md_chunker.chunk(file)
+            elif suffix == ".txt":
+                modified_chunks += self.txt_chunker.chunk(file)
+
+        return modified_chunks

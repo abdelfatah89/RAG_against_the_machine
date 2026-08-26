@@ -1,11 +1,11 @@
-import json
 from abc import ABC, abstractmethod
-from typing import Dict, List
-from tqdm import tqdm  # type: ignore[import-untyped]
+from typing import List, Dict, Tuple
 
 import chromadb
 from rank_bm25 import BM25Okapi  # type: ignore[import-untyped]
-import numpy as np
+
+from .tools import save_processed_data
+
 
 from .chunker import Chunk
 from .models import MinimalSource
@@ -39,10 +39,7 @@ class BM25Retrieval(Retrieval):
             zip(self.chunks, scores), key=lambda pair: pair[1], reverse=True
         )[:k]
 
-        progress = tqdm(
-            desc="Retrieving BM25 Results", unit="chunk", total=k)
         for chunk, score in ranked:
-            progress.update(1)
             chunks.append(
                 MinimalSource(
                     file_path=chunk.file_path,
@@ -53,7 +50,6 @@ class BM25Retrieval(Retrieval):
                     score=score,
                     )
                 )
-        progress.close()
         return chunks
 
 
@@ -62,46 +58,12 @@ class EmbeddingRetrieval(Retrieval):
         super().__init__(chunks)
         self.client = chromadb.PersistentClient(path="chromadb")
         self.collection = self.client.get_or_create_collection("chunks")
-        if self.collection.count() == 0:
-            embedder = Embedder()
-            embeddings = embedder.embed_batch(chunks)
-            self.add_documents(chunks, embeddings)
-
-    def add_documents(self,
-                      documents: List[Chunk],
-                      embeddings: List[np.ndarray]) -> None:
-        progress = tqdm(
-            desc="Adding Chunks to vector database",
-            unit="chunk", total=len(documents))
-        for i, document in enumerate(documents):
-            progress.update(1)
-            if document.file_type == "py" or document.file_type == "md":
-                metadata_text = self.get_metadata(document.metadata)
-                content = metadata_text + document.content
-            else:
-                content = document.content
-            self.collection.add(
-                documents=[content],
-                embeddings=embeddings[i],
-                ids=[f"chunk_{i}"],
-                metadatas=[{
-                    "file_path": document.file_path,
-                    "first_character_index": document.first_character_index,
-                    "last_character_index": document.last_character_index,
-                    "content": document.content,
-                    "file_type": document.file_type,
-                }],
-            )
-        progress.close()
-
-    def get_metadata(self, metadata: Dict[str, str]) -> str:
-        metadata_text = "".join(
-            [f"{key}: {value}" for key, value in metadata.items()])
-        return metadata_text
 
     def retrieve(self, query: str, k: int = 3) -> List[MinimalSource]:
+        embeddings = Embedder().embed(query)
         chunks: List[MinimalSource] = []
-        results = self.collection.query(query_texts=[query], n_results=k)
+        results = self.collection.query(
+            query_embeddings=[embeddings], n_results=k)
         metadatas_result = results.get("metadatas")
         distances_result = results.get("distances")
 
@@ -125,36 +87,75 @@ class EmbeddingRetrieval(Retrieval):
         return chunks
 
 
-class RetrievalFactory:
-    def create_retrieval(self, method: str,
-                         chunks: List[Chunk],
-                         embeddings: List[np.ndarray],
-                         query: str, k: int = 3
-                         ) -> List[MinimalSource]:
+class HybridRetrieval:
+    def __init__(self, chunks: List[Chunk]):
+        self.chunks = chunks
+        self.bm25 = BM25Retrieval(chunks)
+        self.embedding = EmbeddingRetrieval(chunks)
 
-        if method == "bm25":
-            if chunks is None:
-                raise ValueError(
-                    "Chunks must be provided for BM25 retrieval.")
-            bm25 = BM25Retrieval(chunks)
-            retrieved = bm25.retrieve(query, k)
-            self.save_processed_data(
-                retrieved, "data/processed/bm25_processed_data.json")
-            return retrieved
+        self.bm25_results: List[MinimalSource] = []
+        self.embedding_results: List[MinimalSource] = []
 
-        elif method == "embedding":
-            embedding = EmbeddingRetrieval(chunks)
-            retrieved = embedding.retrieve(query, k)
-            self.save_processed_data(
-                retrieved, "data/processed/embedding_processed_data.json")
-            return retrieved
-        else:
-            raise ValueError(f"Unknown retrieval method: {method}")
+    def generate_results(self, query: str, k: int = 3) -> None:
+        self.bm25_results = self.bm25.retrieve(query, k)
+        self.embedding_results = self.embedding.retrieve(query, k)
 
-    def save_processed_data(self,
-                            data: List[MinimalSource],
-                            file_path: str
-                            ) -> None:
-        output_data = [item.model_dump() for item in data]
-        with open(file_path, "w") as f:
-            json.dump(output_data, f, indent=4)
+    @staticmethod
+    def _key(result: MinimalSource) -> Tuple[str, int, int]:
+        return (
+            result.file_path,
+            result.first_character_index,
+            result.last_character_index,
+        )
+
+    @staticmethod
+    def _normalize(results: List[MinimalSource]
+                   ) -> Dict[Tuple[str, int, int], float]:
+        if not results:
+            return {}
+
+        scored = {HybridRetrieval._key(r): r.score for r in results}
+        lo = min(scored.values())
+        hi = max(scored.values())
+        span = (hi - lo) or 1.0
+
+        return {key: (score - lo) / span for key, score in scored.items()}
+
+    def retrieve(self, query: str, k: int = 3,
+                 bm25_factor: float = 0.3,
+                 embedding_factor: float = 0.7
+                 ) -> List[MinimalSource]:
+
+        self.generate_results(query, k)
+
+        bm25_by_key = {self._key(r): r for r in self.bm25_results}
+        embedding_by_key = {self._key(r): r for r in self.embedding_results}
+
+        bm25_norm = self._normalize(self.bm25_results)
+        embedding_norm = self._normalize(self.embedding_results)
+
+        all_keys = set(bm25_by_key) | set(embedding_by_key)
+
+        hybrid_results: List[MinimalSource] = []
+        for key in all_keys:
+            base = bm25_by_key.get(key) or embedding_by_key.get(key)
+            assert base is not None
+
+            bm25_score = bm25_norm.get(key, 0.0)
+            embedding_score = embedding_norm.get(key, 0.0)
+            hybrid_score = (
+                (bm25_factor * bm25_score) +
+                (embedding_factor * embedding_score)
+            )
+
+            hybrid_results.append(
+                base.model_copy(update={"score": hybrid_score})
+            )
+
+        hybrid_results.sort(key=lambda r: r.score, reverse=True)
+        hybrid_results = hybrid_results[:k]
+
+        save_processed_data(
+            hybrid_results, "data/processed/hybrid_processed_data.json")
+
+        return hybrid_results

@@ -1,9 +1,6 @@
-# Source - https://stackoverflow.com/a/82852
-# Posted by rslite, modified by community. See post 'Timeline' for change history
-# Retrieved 2026-08-25, License - CC BY-SA 4.0
+from src.llm_model import LLModel
 
-from pathlib import Path
 
-vectordb = Path("chromadb")
-if vectordb.is_file():
-
+model = LLModel()
+messages = model.generate_prompt("What is the capital of France?")
+print(model.generate(messages))

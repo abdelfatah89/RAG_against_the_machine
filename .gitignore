@@ -8,3 +8,5 @@ vllm-0.10.1/
 *.pyc
 chromadb/
 data/processed/*
+moulinette
+.trash/
