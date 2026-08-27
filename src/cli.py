@@ -3,7 +3,6 @@ import os
 from tqdm import tqdm  # type: ignore[import-untyped]
 
 from src.models import (
-    AnsweredQuestion,
     MinimalSearchResults,
     MinimalAnswer,
     StudentSearchResults,
@@ -13,11 +12,13 @@ from src.models import (
 from .retrieval import BM25Retrieval
 from .indexer import Indexer
 from .llm_model import LLModel
+from .evaluator import Evaluator
 
 
 class CLI:
     def __init__(self):
         self.chunks = []
+        self.evaluator = Evaluator()
         self.llm = LLModel()
         self.index(max_chunk_size=2000)
 
@@ -148,9 +149,11 @@ class CLI:
         with open(output_path, "w") as f:
             json.dump(ss_results_and_answers.model_dump(), f, indent=4)
 
-    def evaluate(
-        self,
-        student_search_results_path: str,
-        dataset_path: str
-            ):
-        pass
+    def evaluate(self,
+                 student_search_results_path: str,
+                 dataset_path: str):
+        recall = self.evaluator.evaluate(
+            student_search_results_path,
+            dataset_path
+        )
+        print(f"Recall: {recall}")

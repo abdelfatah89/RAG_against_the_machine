@@ -37,10 +37,10 @@ class Indexer:
 
         self._save_chunks(chunks)
 
-        embedder = Embedder()
-        embeddings = embedder.embed_batch(chunks)
-        self.vectordb.reset()
-        self.vectordb.add_documents(chunks, embeddings)
+        # embedder = Embedder()
+        # embeddings = embedder.embed_batch(chunks)
+        # self.vectordb.reset()
+        # self.vectordb.add_documents(chunks, embeddings)
 
         self._commit_hashes()
         return chunks

@@ -36,6 +36,12 @@ class Chunker(ABC):
     def chunk(self, path: str) -> List[Chunk]:
         pass  # This method should be implemented in subclasses
 
+    def content_islonger(self, chunks: List[Chunk]) -> bool:
+        return any(
+            len(chunk.content) > self.max_chunk_size
+            for chunk in chunks
+            )
+
 
 class PythonChunker(Chunker):
     def __init__(self, max_chunk_size: int = 2000):
@@ -73,7 +79,7 @@ class PythonChunker(Chunker):
             start = (chunk.first_character_index +
                      chunk.content.find(c, search_from))
             end = start + len(c)
-            args = get_keywords_args(chunk.file_path, start, end, c, "txt")
+            args = get_keywords_args(chunk.file_path, start, end, c, "py")
             chunk_obj = Chunk(**args)
             chunk_objects.append(chunk_obj)
 
@@ -143,11 +149,12 @@ class PythonChunker(Chunker):
                 else:
                     chunk_objects.append(chunk_obj)
 
-        for chunk in chunk_objects:
-            if len(chunk.content) > self.max_chunk_size:
-                sub_chunks = self.split_chunk(chunk)
-                chunk_objects.remove(chunk)
-                chunk_objects.extend(sub_chunks)
+        while self.content_islonger(chunk_objects):
+            for chunk in chunk_objects:
+                if len(chunk.content) > self.max_chunk_size:
+                    sub_chunks = self.split_chunk(chunk)
+                    chunk_objects.remove(chunk)
+                    chunk_objects.extend(sub_chunks)
 
         return chunk_objects
 
@@ -157,6 +164,25 @@ class MarkdownChunker(Chunker):
         super().__init__()
         self.max_chunk_size = max_chunk_size
         self.overlap_size = self.max_chunk_size // 10
+
+    def split_chunk(self, chunk: Chunk) -> List[Chunk]:
+        search_from = 0
+        chunk_objects = []
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=self.max_chunk_size,
+            chunk_overlap=self.overlap_size,
+        )
+
+        chunks = splitter.split_text(chunk.content)
+        for c in chunks:
+            start = (chunk.first_character_index +
+                     chunk.content.find(c, search_from))
+            end = start + len(c)
+            args = get_keywords_args(chunk.file_path, start, end, c, "md")
+            chunk_obj = Chunk(**args)
+            chunk_objects.append(chunk_obj)
+
+        return chunk_objects
 
     def chunk(self, path: str) -> List[Chunk]:
         search_from = 0
@@ -183,6 +209,13 @@ class MarkdownChunker(Chunker):
             chunk_obj = Chunk(**args)
             search_from = end
             chunk_objects.append(chunk_obj)
+
+        while self.content_islonger(chunk_objects):
+            for chunk_obj in chunk_objects:
+                if len(chunk_obj.content) > self.max_chunk_size:
+                    sub_chunks = self.split_chunk(chunk_obj)
+                    chunk_objects.remove(chunk_obj)
+                    chunk_objects.extend(sub_chunks)
 
         return chunk_objects
 
