@@ -47,7 +47,7 @@ class PythonChunker(Chunker):
     def __init__(self, max_chunk_size: int = 2000):
         super().__init__()
         self.max_chunk_size = max_chunk_size
-        self.overlap_size = self.max_chunk_size // 10
+        self.overlap_size = self.max_chunk_size * 0.1
 
     def get_offsets(self, source: str, node: ast.stmt) -> tuple[int, int]:
         lines = source.splitlines(keepends=True)
@@ -163,7 +163,7 @@ class MarkdownChunker(Chunker):
     def __init__(self, max_chunk_size: int = 2000):
         super().__init__()
         self.max_chunk_size = max_chunk_size
-        self.overlap_size = self.max_chunk_size // 10
+        self.overlap_size = self.max_chunk_size * 0.1
 
     def split_chunk(self, chunk: Chunk) -> List[Chunk]:
         search_from = 0
@@ -224,7 +224,7 @@ class TextChunker(Chunker):
     def __init__(self, max_chunk_size: int = 2000):
         super().__init__()
         self.max_chunk_size = max_chunk_size
-        self.overlap_size = self.max_chunk_size // 10
+        self.overlap_size = self.max_chunk_size * 0.1
 
     def chunk(self, path: str) -> List[Chunk]:
         search_from = 0

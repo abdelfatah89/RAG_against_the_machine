@@ -24,9 +24,9 @@ class CLI:
 
         self.bm25 = BM25Retrieval(self.chunks)
 
-    def index(self, max_chunk_size: int = 2000) -> None:
+    def index(self, re = False, max_chunk_size: int = 2000) -> None:
         indexer = Indexer(max_chunk_size=max_chunk_size)
-        chunks = indexer.run()
+        chunks = indexer.run(re)
         self.chunks = chunks
 
     def search(self,
@@ -156,4 +156,3 @@ class CLI:
             student_search_results_path,
             dataset_path
         )
-        print(f"Recall: {recall}")

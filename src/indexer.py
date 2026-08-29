@@ -21,7 +21,9 @@ class Indexer:
         self.chunks_factory.file_manager = self.file_manager
         self.vectordb = VectorDB()
 
-    def run(self) -> List[Chunk]:
+    def run(self, re: bool = False) -> List[Chunk]:
+        if re:
+            return self._full_index(re=True)
         if not PROCESSED_CHUNKS_PATH.is_file():
             return self._full_index()
 
@@ -31,8 +33,11 @@ class Indexer:
 
         return self._incremental_index()
 
-    def _full_index(self) -> List[Chunk]:
-        print("No existing processed chunks found. Indexing all files...")
+    def _full_index(self, re: bool = False) -> List[Chunk]:
+        if re:
+            print("Re-indexing all files...")
+        else:
+            print("No existing processed chunks found. Indexing all files...")
         chunks = self.chunks_factory.get_chunks()
 
         self._save_chunks(chunks)
