@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Optional
 from abc import ABC, abstractmethod
 from pathlib import Path
 import ast
@@ -15,6 +15,7 @@ from .tools import get_keywords_args
 
 
 SUPPORTED_EXTENSIONS = {".py", ".md", ".txt"}
+MARKDOWN_HEADERS = ("# ", "## ", "### ", "#### ", "##### ", "###### ")
 
 
 class Chunk(MinimalSource):
@@ -25,6 +26,21 @@ class Chunk(MinimalSource):
     file_type: str = ""
     metadata: dict = {}
     score: float = 0.0
+
+
+def _read(path: str) -> str:
+    with open(path, "r") as f:
+        return f.read()
+
+
+def _make_chunk(path: str, start: int, end: int, text: str,
+                file_type: str, metadata: Optional[Dict] = None) -> Chunk:
+    """Build a single Chunk via get_keywords_args, mirroring the exact
+    call shape callers used to write out by hand."""
+    if metadata is None:
+        return Chunk(**get_keywords_args(path, start, end, text, file_type))
+    return Chunk(
+        **get_keywords_args(path, start, end, text, file_type, metadata))
 
 
 class Chunker(ABC):
@@ -47,11 +63,10 @@ class PythonChunker(Chunker):
     def __init__(self, max_chunk_size: int = 2000):
         super().__init__()
         self.max_chunk_size = max_chunk_size
-        self.overlap_size = self.max_chunk_size * 0.1
 
     def get_offsets(self, source: str, node: ast.stmt) -> tuple[int, int]:
-        lines = source.splitlines(keepends=True)
 
+        lines = source.splitlines(keepends=True)
         start_lineno = getattr(node, "lineno", 1)
         start_col = getattr(node, "col_offset", 0)
         end_lineno = getattr(node, "end_lineno", start_lineno)
@@ -59,7 +74,6 @@ class PythonChunker(Chunker):
 
         start = sum(len(line) for line in lines[:start_lineno - 1])
         start += start_col
-
         end = sum(len(line) for line in lines[:end_lineno - 1])
         end += end_col
 
@@ -163,7 +177,6 @@ class MarkdownChunker(Chunker):
     def __init__(self, max_chunk_size: int = 2000):
         super().__init__()
         self.max_chunk_size = max_chunk_size
-        self.overlap_size = self.max_chunk_size * 0.1
 
     def split_chunk(self, chunk: Chunk) -> List[Chunk]:
         search_from = 0
@@ -224,7 +237,6 @@ class TextChunker(Chunker):
     def __init__(self, max_chunk_size: int = 2000):
         super().__init__()
         self.max_chunk_size = max_chunk_size
-        self.overlap_size = self.max_chunk_size * 0.1
 
     def chunk(self, path: str) -> List[Chunk]:
         search_from = 0
