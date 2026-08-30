@@ -10,3 +10,4 @@ chromadb/
 data/processed/*
 moulinette
 .trash/
+.test/

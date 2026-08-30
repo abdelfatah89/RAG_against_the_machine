@@ -4,13 +4,15 @@ Computes recall@k by comparing student-produced search results against
 a ground-truth dataset of RAG questions, using an Intersection-over-Union
 (IoU) overlap of character ranges to decide whether a retrieved source
 matches a correct source.
+
+Character ranges use an exclusive end index, i.e. ``last_character_index``
+behaves like Python slicing (``text[first:last]``), matching the reference
+moulinette's behaviour as verified by black-box testing.
 """
 
 import json
 from typing import Any, Dict, List, Optional
 
-# The subject states the overlap bar is low: an IoU of 0.05 is enough
-# for a retrieved chunk to count as covering the right region of a file.
 IOU_THRESHOLD = 0.05
 
 
@@ -53,8 +55,6 @@ class Evaluator:
         for question in questions:
             correct_sources = question.get("sources", [])
             if not correct_sources:
-                # Nothing to recall for this question; skip it rather
-                # than silently reuse a stale value or divide by zero.
                 continue
 
             retrieved_sources = self._get_retrieved_sources(
@@ -94,7 +94,7 @@ class Evaluator:
                 retrieved_start,
                 retrieved_end,
             )
-            if iou >= IOU_THRESHOLD:
+            if iou > IOU_THRESHOLD:
                 return True
 
         return False
@@ -130,14 +130,20 @@ class Evaluator:
     ) -> float:
         """Compute the Intersection-over-Union of two integer ranges.
 
-        Ranges are treated as inclusive on both ends (as in the subject's
-        ``first_character_index`` / ``last_character_index`` convention).
+        Ranges use an exclusive end index, i.e. the same convention as
+        Python slicing (``text[start:end]``). This matches the reference
+        moulinette's behaviour, confirmed by black-box testing: e.g. a
+        correct range of ``[100, 199]`` against a retrieved range of
+        ``[90, 105]`` is *not* a match, which only holds under the
+        exclusive-end convention (IoU ~0.046) and not the inclusive one
+        (IoU ~0.055, which would incorrectly count as a match).
 
         Args:
             first_start: Start index of the first (correct) range.
-            first_end: End index of the first (correct) range.
+            first_end: Exclusive end index of the first (correct) range.
             second_start: Start index of the second (retrieved) range.
-            second_end: End index of the second (retrieved) range.
+            second_end: Exclusive end index of the second (retrieved)
+                range.
 
         Returns:
             The IoU as a float in [0.0, 1.0].
@@ -156,15 +162,15 @@ class Evaluator:
 
         intersection_start = max(first_start, second_start)
         intersection_end = min(first_end, second_end)
-        if intersection_start > intersection_end:
+        if intersection_start >= intersection_end:
             return 0.0
 
-        intersection = intersection_end - intersection_start + 1
-        first_length = first_end - first_start + 1
-        second_length = second_end - second_start + 1
+        intersection = intersection_end - intersection_start
+        first_length = first_end - first_start
+        second_length = second_end - second_start
         union = first_length + second_length - intersection
 
-        return intersection / union
+        return intersection / union if union > 0 else 0.0
 
     def _get_retrieved_sources(
         self,

@@ -10,6 +10,7 @@ from .tools import save_processed_data
 from .chunker import Chunk
 from .models import MinimalSource
 from .embedder import Embedder
+from .bm25_tokenizer import tokenize
 
 
 class Retrieval(ABC):
@@ -26,12 +27,12 @@ class BM25Retrieval(Retrieval):
         super().__init__(chunks)
 
         self.tokenized_docs = [
-            chunk.content.lower().split() for chunk in self.chunks
+            tokenize(chunk.content) for chunk in self.chunks
         ]
         self.bm25 = BM25Okapi(self.tokenized_docs)
 
     def retrieve(self, query: str, k: int = 3) -> List[MinimalSource]:
-        tokenized_query = query.lower().split()
+        tokenized_query = tokenize(query)
         scores = self.bm25.get_scores(tokenized_query)
         chunks: List[MinimalSource] = []
 
