@@ -87,9 +87,10 @@ class CLI:
 
     def answer(self,
                query: str | UnansweredQuestion,
-               k: int, p: bool = True) -> StudentSearchResultsAndAnswer:
+               k: int, p: bool = True) -> StudentSearchResultsAndAnswer | None:
         sources = self.search(query, k, p=False)
-        messages = self.llm.generate_prompt(query, sources.retrieved_sources)
+        source_texts = [source.content for source in sources.retrieved_sources]
+        messages = self.llm.generate_prompt(sources.question, source_texts)
         answer = self.llm.generate(messages)
         min_answer = MinimalAnswer(
             question_id=sources.question_id,
@@ -109,6 +110,7 @@ class CLI:
         output = json.dumps(output_dict, indent=4)
         if p:
             print(output)
+            return None
 
         return ss_results_and_answers
 
@@ -130,8 +132,9 @@ class CLI:
         for question in unanswered_questions:
             progress_bar.update(1)
             sources = self.search(question, k=10, p=False)
+            source_texts = [source.content for source in sources.retrieved_sources]
             messages = self.llm.generate_prompt(
-                question.question, sources.retrieved_sources)
+                question.question, source_texts)
             answer = self.llm.generate(messages)
             min_answer = MinimalAnswer(
                 question_id=question.question_id,
@@ -157,8 +160,13 @@ class CLI:
     def evaluate(self,
                  student_search_results_path: str,
                  dataset_path: str):
-        # recall = self.evaluator.evaluate(
-        #     student_search_results_path,
-        #     dataset_path
-        # )
-        return
+        try:
+            recall = self.evaluator.evaluate(
+                student_search_results_path,
+                dataset_path
+            )
+        except ValueError as exc:
+            print(f"Evaluation failed: {exc}")
+            return
+
+        print(f"Recall: {recall:.3f} ({recall * 100:.1f}%)")
