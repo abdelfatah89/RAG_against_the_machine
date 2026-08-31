@@ -31,16 +31,25 @@ class BM25Retrieval(Retrieval):
         ]
         self.bm25 = BM25Okapi(self.tokenized_docs)
 
+    @staticmethod
+    def _rank_score(chunk: Chunk, score: float) -> float:
+        if "/docs/" in chunk.file_path and chunk.file_type == "md":
+            score += 2.0
+        return score
+
     def retrieve(self, query: str, k: int = 3) -> List[MinimalSource]:
         tokenized_query = tokenize(query)
         scores = self.bm25.get_scores(tokenized_query)
         chunks: List[MinimalSource] = []
 
         ranked = sorted(
-            zip(self.chunks, scores), key=lambda pair: pair[1], reverse=True
+            zip(self.chunks, scores),
+            key=lambda pair: self._rank_score(pair[0], pair[1]),
+            reverse=True,
         )[:k]
 
         for chunk, score in ranked:
+            rank_score = self._rank_score(chunk, score)
             chunks.append(
                 MinimalSource(
                     file_path=chunk.file_path,
@@ -48,7 +57,7 @@ class BM25Retrieval(Retrieval):
                     last_character_index=chunk.last_character_index,
                     content=chunk.content,
                     file_type=chunk.file_type,
-                    score=score,
+                    score=rank_score,
                     )
                 )
         return chunks
