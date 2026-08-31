@@ -79,11 +79,6 @@ class CLI:
 
         ss_results = StudentSearchResults(search_results=ms_results, k=k)
         result_dict = ss_results.model_dump()
-        # for result in result_dict["search_results"]:
-        #     del result["retrieved_sources"][0]["content"]
-        #     del result["retrieved_sources"][0]["file_type"]
-        #     del result["retrieved_sources"][0]["score"]
-        #     del result["retrieved_sources"][0]["metadata"]
 
         output_path = f"{save_directory}/{dataset_path.split('/')[-1]}"
         os.makedirs(save_directory, exist_ok=True)
@@ -104,7 +99,14 @@ class CLI:
         )
         ss_results_and_answers = StudentSearchResultsAndAnswer(
             search_results=[min_answer], k=k)
-        output = ss_results_and_answers.model_dump_json(indent=4)
+        output_dict = ss_results_and_answers.model_dump()
+        for mr in output_dict["search_results"]:
+            for source in mr["retrieved_sources"]:
+                del source["content"]
+                del source["metadata"]
+                del source["file_type"]
+                del source["score"]
+        output = json.dumps(output_dict, indent=4)
         if p:
             print(output)
 
