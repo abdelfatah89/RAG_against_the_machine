@@ -9,7 +9,7 @@ from src.models import (
     StudentSearchResultsAndAnswer,
     UnansweredQuestion)
 
-from .retrieval import BM25Retrieval
+from .retrieval import BM25Retrieval, HybridRetrieval
 from .indexer import Indexer
 from .llm_model import LLModel
 from .evaluator import Evaluator
@@ -184,3 +184,84 @@ class CLI:
             return
 
         print(f"Recall: {recall:.3f} ({recall * 100:.1f}%)")
+
+    @_safe
+    def hybrid_search(self,
+                      query: str | UnansweredQuestion,
+                      k: int = 10,
+                      bm25_factor: float = 0.3,
+                      embedding_factor: float = 0.7,
+                      p: bool = True) -> MinimalSearchResults | None:
+        """Retrieve top-k sources with combined BM25 and embeddings."""
+        if isinstance(query, UnansweredQuestion):
+            question = query
+        else:
+            question = UnansweredQuestion(question=query)
+
+        hybrid = HybridRetrieval(self.chunks)
+        results = hybrid.retrieve(
+            question.question,
+            k,
+            bm25_factor=bm25_factor,
+            embedding_factor=embedding_factor)
+        ms_results = MinimalSearchResults(
+            question_id=question.question_id,
+            question=question.question,
+            retrieved_sources=results)
+
+        ss_results = StudentSearchResults(
+            search_results=[ms_results],
+            k=k)
+        output_dict = ss_results.model_dump()
+        for mr in output_dict["search_results"]:
+            for source in mr["retrieved_sources"]:
+                del source["content"]
+                del source["metadata"]
+                del source["file_type"]
+        output = json.dumps(output_dict, indent=4)
+        if p:
+            print(output)
+            return None
+        return ms_results
+
+    @_safe
+    def hybrid_answer(
+            self,
+            query: str | UnansweredQuestion,
+            k: int = 10,
+            bm25_factor: float = 0.3,
+            embedding_factor: float = 0.7,
+            p: bool = True) -> StudentSearchResultsAndAnswer | None:
+        """Answer one query using hybrid retrieved context."""
+        sources = self.hybrid_search(
+            query,
+            k=k,
+            bm25_factor=bm25_factor,
+            embedding_factor=embedding_factor,
+            p=False)
+        if sources is None:
+            return None
+
+        source_texts = [source.content for source in sources.retrieved_sources]
+        messages = self.llm.generate_prompt(sources.question, source_texts)
+        answer = self.llm.generate(messages)
+        min_answer = MinimalAnswer(
+            question_id=sources.question_id,
+            question=sources.question,
+            retrieved_sources=sources.retrieved_sources,
+            answer=answer
+        )
+        ss_results_and_answers = StudentSearchResultsAndAnswer(
+            search_results=[min_answer], k=k)
+        output_dict = ss_results_and_answers.model_dump()
+        for mr in output_dict["search_results"]:
+            for source in mr["retrieved_sources"]:
+                del source["content"]
+                del source["metadata"]
+                del source["file_type"]
+        output = json.dumps(output_dict, indent=4)
+        if p:
+            print(output)
+            return None
+
+        return ss_results_and_answers
