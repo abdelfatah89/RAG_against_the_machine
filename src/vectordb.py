@@ -12,6 +12,7 @@ class VectorDB:
     def __init__(self,
                  path: str = "chromadb",
                  collection_name: str = "chunks"):
+        self.collection_name = collection_name
         self.client = chromadb.PersistentClient(path=path)
         self.collection = self.client.get_or_create_collection(collection_name)
 
@@ -53,7 +54,9 @@ class VectorDB:
             self.collection.delete(where={"file_path": path})
 
     def reset(self) -> None:
-        """Drop every document currently in the collection."""
-        existing_ids = self.collection.get()["ids"]
-        if existing_ids:
-            self.collection.delete(ids=existing_ids)
+        try:
+            self.client.delete_collection(self.collection_name)
+        except Exception:
+            pass
+        self.collection = self.client.get_or_create_collection(
+            self.collection_name)
