@@ -21,19 +21,21 @@ class Indexer:
         self.chunks_factory.file_manager = self.file_manager
         self.vectordb = VectorDB()
 
-    def run(self, re: bool = False) -> List[Chunk]:
+    def run(self, re: bool = False, embed: bool = False) -> List[Chunk]:
         if re:
-            return self._full_index(re=True)
+            return self._full_index(re=True, embed=embed)
         if not PROCESSED_CHUNKS_PATH.is_file():
-            return self._full_index()
+            return self._full_index(embed=embed)
 
         if not self.file_manager.modified_files_exist():
             print("No modified files detected. Nothing to index.")
             return self._load_chunks()
 
-        return self._incremental_index()
+        return self._incremental_index(embed)
 
-    def _full_index(self, re: bool = False) -> List[Chunk]:
+    def _full_index(self,
+                    re: bool = False,
+                    embed: bool = False) -> List[Chunk]:
         if re:
             print("Re-indexing all files...")
         else:
@@ -42,15 +44,16 @@ class Indexer:
 
         self._save_chunks(chunks)
 
-        # embedder = Embedder()
-        # embeddings = embedder.embed_batch(chunks)
-        # self.vectordb.reset()
-        # self.vectordb.add_documents(chunks, embeddings)
+        if embed:
+            embedder = Embedder()
+            embeddings = embedder.embed_batch(chunks)
+            self.vectordb.reset()
+            self.vectordb.add_documents(chunks, embeddings)
 
         self._commit_hashes()
         return chunks
 
-    def _incremental_index(self) -> List[Chunk]:
+    def _incremental_index(self, embed: bool = False) -> List[Chunk]:
         modified_chunks = self.chunks_factory.get_modified_chunks()
         deleted_files = self.file_manager.get_deleted_files()
         stale_paths: Set[str] = (
@@ -61,11 +64,11 @@ class Indexer:
 
         self._save_modified_chunks(modified_chunks, stale_paths)
 
-        if stale_paths:
+        if stale_paths and embed:
             self.vectordb.delete_by_paths(list(stale_paths))
             print(f"Deleted {len(stale_paths)} stale file(s)"
                   " from vector database.")
-        if modified_chunks:
+        if modified_chunks and embed:
             embedder = Embedder()
             embeddings = embedder.embed_batch(modified_chunks)
             self.vectordb.add_documents(modified_chunks, embeddings)

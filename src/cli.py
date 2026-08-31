@@ -20,13 +20,16 @@ class CLI:
         self.chunks = []
         self.evaluator = Evaluator()
         self.llm = LLModel()
-        self.index(force=False, max_chunk_size=2000)
+        self.index(force=False, embed=False, max_chunk_size=2000)
 
         self.bm25 = BM25Retrieval(self.chunks)
 
-    def index(self, force=False, max_chunk_size: int = 2000) -> None:
+    def index(self,
+              force=False,
+              embed=False,
+              max_chunk_size: int = 2000) -> None:
         indexer = Indexer(max_chunk_size=max_chunk_size)
-        chunks = indexer.run(force)
+        chunks = indexer.run(force, embed)
         self.chunks = chunks
 
     def search(self,
