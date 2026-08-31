@@ -13,6 +13,7 @@ from .retrieval import BM25Retrieval
 from .indexer import Indexer
 from .llm_model import LLModel
 from .evaluator import Evaluator
+from .tools import _safe
 
 
 class CLI:
@@ -24,17 +25,21 @@ class CLI:
 
         self.bm25 = BM25Retrieval(self.chunks)
 
+    @_safe
     def index(self,
               force=False,
               embed=False,
               max_chunk_size: int = 2000) -> None:
+        """Build or load the document index."""
         indexer = Indexer(max_chunk_size=max_chunk_size)
         chunks = indexer.run(force, embed)
         self.chunks = chunks
 
+    @_safe
     def search(self,
                query: str | UnansweredQuestion,
                k: int, p: bool = True) -> MinimalSearchResults:
+        """Retrieve the top-k sources for one query."""
 
         if isinstance(query, UnansweredQuestion):
             question = query
@@ -55,9 +60,11 @@ class CLI:
             print(output)
         return ms_results
 
+    @_safe
     def search_dataset(
             self, dataset_path: str,
             k: int, save_directory: str):
+        """Run retrieval for every question in a dataset and save JSON."""
 
         with open(dataset_path, "r") as f:
             questions = json.load(f)
@@ -85,9 +92,11 @@ class CLI:
         with open(output_path, "w") as f:
             json.dump(result_dict, f, indent=4)
 
+    @_safe
     def answer(self,
                query: str | UnansweredQuestion,
                k: int, p: bool = True) -> StudentSearchResultsAndAnswer | None:
+        """Answer one query using retrieved context."""
         sources = self.search(query, k, p=False)
         source_texts = [source.content for source in sources.retrieved_sources]
         messages = self.llm.generate_prompt(sources.question, source_texts)
@@ -114,9 +123,11 @@ class CLI:
 
         return ss_results_and_answers
 
+    @_safe
     def answer_dataset(self,
                        student_search_results_path: str,
                        save_directory: str):
+        """Generate answers for a saved search-results dataset."""
         with open(student_search_results_path, "r") as f:
             questions = json.load(f)
 
@@ -132,7 +143,8 @@ class CLI:
         for question in unanswered_questions:
             progress_bar.update(1)
             sources = self.search(question, k=10, p=False)
-            source_texts = [source.content for source in sources.retrieved_sources]
+            source_texts = [
+                source.content for source in sources.retrieved_sources]
             messages = self.llm.generate_prompt(
                 question.question, source_texts)
             answer = self.llm.generate(messages)
@@ -157,9 +169,11 @@ class CLI:
         with open(output_path, "w") as f:
             json.dump(ss_results_and_answers.model_dump(), f, indent=4)
 
+    @_safe
     def evaluate(self,
                  student_search_results_path: str,
                  dataset_path: str):
+        """Print recall for student search results against ground truth."""
         try:
             recall = self.evaluator.evaluate(
                 student_search_results_path,

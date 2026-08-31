@@ -33,6 +33,13 @@ class BM25Retrieval(Retrieval):
 
     @staticmethod
     def _rank_score(chunk: Chunk, score: float) -> float:
+        """Prefer official docs when BM25 scores are otherwise close.
+
+        Documentation questions often retrieve the correct markdown chunk in
+        the top 10, but Python examples/tests can outrank it by a small margin
+        because they repeat the same identifiers. This boost keeps lexical
+        ranking dominant while moving close docs matches into the top 5.
+        """
         if "/docs/" in chunk.file_path and chunk.file_type == "md":
             score += 2.0
         return score
