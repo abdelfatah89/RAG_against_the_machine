@@ -11,3 +11,4 @@ data/processed/*
 moulinette
 .trash/
 .test/
+data/*/*
