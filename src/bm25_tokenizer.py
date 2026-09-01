@@ -3,7 +3,7 @@ import unicodedata
 from typing import List, Optional, Set
 
 try:
-    from nltk.stem import SnowballStemmer  # type: ignore[import-untyped]
+    from nltk.stem import SnowballStemmer  # type: ignore[import-not-found]
     _STEMMER: Optional[SnowballStemmer] = SnowballStemmer("english")
 except ImportError:
     _STEMMER = None
