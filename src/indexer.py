@@ -4,7 +4,6 @@ import json
 
 from .chunker import ChunksFactory, Chunk
 from .file_manager import FileManager
-from .embedder import Embedder
 from .vectordb import VectorDB
 
 
@@ -19,7 +18,7 @@ class Indexer:
             data_dir=data_dir, max_chunk_size=max_chunk_size)
         # Share one FileManager so hash lookups aren't recomputed twice.
         self.chunks_factory.file_manager = self.file_manager
-        self.vectordb = VectorDB()
+        self.vectordb: VectorDB | None = None
 
     def run(self, re: bool = False, embed: bool = False) -> List[Chunk]:
         if re:
@@ -45,6 +44,9 @@ class Indexer:
         self._save_chunks(chunks)
 
         if embed:
+            from .embedder import Embedder
+
+            self.vectordb = VectorDB()
             embedder = Embedder()
             embeddings = embedder.embed_batch(chunks)
             self.vectordb.reset()
@@ -65,10 +67,17 @@ class Indexer:
         self._save_modified_chunks(modified_chunks, stale_paths)
 
         if stale_paths and embed:
+            if self.vectordb is None:
+                self.vectordb = VectorDB()
+            assert self.vectordb is not None
             self.vectordb.delete_by_paths(list(stale_paths))
             print(f"Deleted {len(stale_paths)} stale file(s)"
                   " from vector database.")
         if modified_chunks and embed:
+            from .embedder import Embedder
+
+            if self.vectordb is None:
+                self.vectordb = VectorDB()
             embedder = Embedder()
             embeddings = embedder.embed_batch(modified_chunks)
             self.vectordb.add_documents(modified_chunks, embeddings)

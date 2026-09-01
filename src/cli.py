@@ -1,6 +1,6 @@
 import json
 import os
-from typing import List
+from typing import Any, List
 from tqdm import tqdm
 
 from src.models import (
@@ -8,11 +8,11 @@ from src.models import (
     MinimalAnswer,
     StudentSearchResults,
     StudentSearchResultsAndAnswer,
-    UnansweredQuestion)
+    UnansweredQuestion,
+    MinimalSource)
 
 from .retrieval import BM25Retrieval, HybridRetrieval
 from .indexer import Indexer
-from .llm_model import LLModel
 from .evaluator import Evaluator
 from .chunker import Chunk
 from .tools import _safe
@@ -22,13 +22,30 @@ class CLI:
     def __init__(self) -> None:
         self.chunks: List[Chunk] = []
         self.evaluator = Evaluator()
-        self.llm = LLModel()
+        self.llm: Any | None = None
+        self.bm25: BM25Retrieval | None = None
         self.hybrid: HybridRetrieval | None = None
-        self.index(force=False, embed=False, max_chunk_size=2000)
 
-        self.bm25 = BM25Retrieval(self.chunks)
+    def _ensure_index(self) -> None:
+        if self.chunks:
+            return
+        indexer = Indexer(data_dir="data/raw", max_chunk_size=2000)
+        self.chunks = indexer.run(False, False)
+
+    def _bm25(self) -> BM25Retrieval:
+        self._ensure_index()
+        if self.bm25 is None:
+            self.bm25 = BM25Retrieval(self.chunks)
+        return self.bm25
+
+    def _llm(self) -> Any:
+        if self.llm is None:
+            from .llm_model import LLModel
+            self.llm = LLModel()
+        return self.llm
 
     def _hybrid(self) -> HybridRetrieval:
+        self._ensure_index()
         if self.hybrid is None:
             self.hybrid = HybridRetrieval(self.chunks)
         return self.hybrid
@@ -43,18 +60,20 @@ class CLI:
         indexer = Indexer(data_dir=data_dir, max_chunk_size=max_chunk_size)
         chunks = indexer.run(force, embed)
         self.chunks = chunks
+        self.bm25 = None
+        self.hybrid = None
 
     @_safe
     def search(self,
                query: str | UnansweredQuestion,
-               k: int, p: bool = True) -> MinimalSearchResults:
+               k: int, p: bool = True) -> MinimalSearchResults | None:
         """Retrieve the top-k sources for one query."""
 
         if isinstance(query, UnansweredQuestion):
             question = query
         else:
             question = UnansweredQuestion(question=query)
-        results = self.bm25.retrieve(question.question, k)
+        results = self._bm25().retrieve(question.question, k)
         ms_results = MinimalSearchResults(
             question_id=question.question_id,
             question=question.question,
@@ -67,6 +86,7 @@ class CLI:
         output = ss_results.model_dump_json(indent=4)
         if p:
             print(output)
+            return None
         return ms_results
 
     @_safe
@@ -90,6 +110,8 @@ class CLI:
         for question in unanswered_questions:
             progress_bar.update(1)
             ms_result = self.search(question, k, p=False)
+            if ms_result is None:
+                continue
             ms_results.append(ms_result)
         progress_bar.close()
 
@@ -107,9 +129,12 @@ class CLI:
                k: int, p: bool = True) -> StudentSearchResultsAndAnswer | None:
         """Answer one query using retrieved context."""
         sources = self.search(query, k, p=False)
+        if sources is None:
+            return None
         source_texts = [source.content for source in sources.retrieved_sources]
-        messages = self.llm.generate_prompt(sources.question, source_texts)
-        answer = self.llm.generate(messages)
+        llm = self._llm()
+        messages = llm.generate_prompt(sources.question, source_texts)
+        answer = llm.generate(messages)
         min_answer = MinimalAnswer(
             question_id=sources.question_id,
             question=sources.question,
@@ -138,28 +163,28 @@ class CLI:
                        save_directory: str) -> None:
         """Generate answers for a saved search-results dataset."""
         with open(student_search_results_path, "r") as f:
-            questions = json.load(f)
+            saved_results = json.load(f)
 
-        questions = questions.get("rag_questions", [])
-        unanswered_questions = [
-            UnansweredQuestion(**question) for question in questions]
+        search_results = saved_results.get("search_results", [])
+        k = int(saved_results.get("k", 0))
         min_answers = []
 
-        progress_bar = tqdm(unanswered_questions,
+        progress_bar = tqdm(search_results,
                             desc="Processing questions",
                             unit="question",
-                            total=len(unanswered_questions))
-        for question in unanswered_questions:
+                            total=len(search_results))
+        for result in search_results:
             progress_bar.update(1)
-            sources = self.search(question, k=10, p=False)
+            sources = MinimalSearchResults(**result)
             source_texts = [
-                source.content for source in sources.retrieved_sources]
-            messages = self.llm.generate_prompt(
-                question.question, source_texts)
-            answer = self.llm.generate(messages)
+                self._source_content(source)
+                for source in sources.retrieved_sources]
+            llm = self._llm()
+            messages = llm.generate_prompt(sources.question, source_texts)
+            answer = llm.generate(messages)
             min_answer = MinimalAnswer(
-                question_id=question.question_id,
-                question=question.question,
+                question_id=sources.question_id,
+                question=sources.question,
                 retrieved_sources=sources.retrieved_sources,
                 answer=answer
             )
@@ -167,7 +192,7 @@ class CLI:
         progress_bar.close()
 
         ss_results_and_answers = StudentSearchResultsAndAnswer(
-            search_results=min_answers, k=10)
+            search_results=min_answers, k=k)
 
         output_path = (
             f"{save_directory}/"
@@ -177,6 +202,16 @@ class CLI:
         os.makedirs(save_directory, exist_ok=True)
         with open(output_path, "w") as f:
             json.dump(ss_results_and_answers.model_dump(), f, indent=4)
+
+    def _source_content(self, source: MinimalSource) -> str:
+        if source.content:
+            return source.content
+        try:
+            with open(source.file_path, "r", encoding="utf-8") as f:
+                return f.read()[
+                    source.first_character_index:source.last_character_index]
+        except OSError:
+            return ""
 
     @_safe
     def evaluate(self,
@@ -252,8 +287,9 @@ class CLI:
             return None
 
         source_texts = [source.content for source in sources.retrieved_sources]
-        messages = self.llm.generate_prompt(sources.question, source_texts)
-        answer = self.llm.generate(messages)
+        llm = self._llm()
+        messages = llm.generate_prompt(sources.question, source_texts)
+        answer = llm.generate(messages)
         min_answer = MinimalAnswer(
             question_id=sources.question_id,
             question=sources.question,

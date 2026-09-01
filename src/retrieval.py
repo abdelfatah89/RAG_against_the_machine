@@ -9,7 +9,6 @@ from .tools import save_processed_data
 
 from .chunker import Chunk
 from .models import MinimalSource
-from .embedder import Embedder
 from .bm25_tokenizer import tokenize
 
 
@@ -29,7 +28,8 @@ class BM25Retrieval(Retrieval):
         self.tokenized_docs = [
             tokenize(chunk.content) for chunk in self.chunks
         ]
-        self.bm25 = BM25Okapi(self.tokenized_docs)
+        self.bm25 = (BM25Okapi(self.tokenized_docs)
+                     if self.tokenized_docs else None)
 
     @staticmethod
     def _rank_score(chunk: Chunk, score: float) -> float:
@@ -45,6 +45,9 @@ class BM25Retrieval(Retrieval):
         return score
 
     def retrieve(self, query: str, k: int = 3) -> List[MinimalSource]:
+        if k <= 0 or self.bm25 is None:
+            return []
+
         tokenized_query = tokenize(query)
         scores = self.bm25.get_scores(tokenized_query)
         chunks: List[MinimalSource] = []
@@ -79,6 +82,11 @@ class EmbeddingRetrieval(Retrieval):
         self.collection = self.client.get_or_create_collection("chunks")
 
     def retrieve(self, query: str, k: int = 3) -> List[MinimalSource]:
+        if k <= 0:
+            return []
+
+        from .embedder import Embedder
+
         embeddings = Embedder().embed(query)
         chunks: List[MinimalSource] = []
         results = self.collection.query(
