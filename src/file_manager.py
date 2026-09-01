@@ -1,7 +1,7 @@
 from pathlib import Path
 import hashlib
 import json
-from typing import Dict, List
+from typing import Any, Dict, List
 
 
 SUPPORTED_EXTENSIONS = {".py", ".md", ".txt"}
@@ -37,7 +37,7 @@ class FileManager:
         with open(HASHES_PATH, "w") as f:
             json.dump(hashes, f, indent=4)
 
-    def get_old_hashes(self) -> Dict[str, str]:
+    def get_old_hashes(self) -> Any:
         if HASHES_PATH.is_file():
             with open(HASHES_PATH, "r") as f:
                 return json.load(f)

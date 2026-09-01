@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Tuple
 
 import chromadb
-from rank_bm25 import BM25Okapi  # type: ignore[import-untyped]
+from rank_bm25 import BM25Okapi
 
 from .tools import save_processed_data
 
@@ -73,14 +73,16 @@ class BM25Retrieval(Retrieval):
 class EmbeddingRetrieval(Retrieval):
     def __init__(self, chunks: List[Chunk]) -> None:
         super().__init__(chunks)
-        self.client = chromadb.PersistentClient(path="chromadb")
+        self.client = chromadb.PersistentClient(  # type: ignore[attr-defined]
+            path="chromadb"
+        )
         self.collection = self.client.get_or_create_collection("chunks")
 
     def retrieve(self, query: str, k: int = 3) -> List[MinimalSource]:
         embeddings = Embedder().embed(query)
         chunks: List[MinimalSource] = []
         results = self.collection.query(
-            query_embeddings=[embeddings], n_results=k)
+            query_embeddings=embeddings, n_results=k)
         metadatas_result = results.get("metadatas")
         distances_result = results.get("distances")
 

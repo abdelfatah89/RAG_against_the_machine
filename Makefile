@@ -60,4 +60,10 @@ start-local-api:
 	@uv run python -m src.local_api
 
 lint:
+	uv run flake8 .
+	uv run mypy --warn-return-any \
+	--warn-unused-ignores --disallow-untyped-defs --check-untyped-defs
+
 lint-strict:
+	uv run flake8 .
+	uv run mypy . --strict

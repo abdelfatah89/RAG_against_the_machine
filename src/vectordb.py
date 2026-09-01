@@ -1,6 +1,8 @@
 from typing import List
 import chromadb
-from tqdm import tqdm  # type: ignore[import-untyped]
+import numpy as np
+from numpy.typing import NDArray
+from tqdm import tqdm
 
 from .chunker import Chunk
 
@@ -13,7 +15,9 @@ class VectorDB:
                  path: str = "chromadb",
                  collection_name: str = "chunks"):
         self.collection_name = collection_name
-        self.client = chromadb.PersistentClient(path=path)
+        self.client = chromadb.PersistentClient(  # type: ignore[attr-defined]
+            path=path
+        )
         self.collection = self.client.get_or_create_collection(collection_name)
 
     @staticmethod
@@ -31,7 +35,11 @@ class VectorDB:
             return metadata_text + document.content
         return document.content
 
-    def add_documents(self, documents: List[Chunk], embeddings: List) -> None:
+    def add_documents(
+        self,
+        documents: List[Chunk],
+        embeddings: List[NDArray[np.float32]],
+    ) -> None:
         for chunk, embedding in tqdm(
                 list(zip(documents, embeddings)),
                 desc="Adding chunks to vector database",

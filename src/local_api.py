@@ -1,9 +1,11 @@
+from typing import Any, Dict
+
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 
-from .models import StudentSearchResults
+from .models import StudentSearchResults, StudentSearchResultsAndAnswer
 from .file_manager import FileManager
 from .cli import CLI
 
@@ -13,22 +15,22 @@ CHUNKS_CACHE_FILE = "data/processed/processed_chunks.json"
 
 
 class LocalAPI:
-    def __init__(self):
+    def __init__(self) -> None:
         self.app = FastAPI()
         self.file_manager = FileManager(DATA_DIR)
-        self.cli = None
+        self.cli: CLI | None = None
         self._setup_cors()
         self._setup_routes()
 
-    def run(self):
+    def run(self) -> None:
         uvicorn.run(self.app)
 
-    def _cli(self):
+    def _cli(self) -> CLI:
         if self.cli is None:
             self.cli = CLI()
         return self.cli
 
-    def _setup_cors(self):
+    def _setup_cors(self) -> None:
         self.app.add_middleware(
             CORSMiddleware,
             allow_origins=["*"],
@@ -37,9 +39,9 @@ class LocalAPI:
             allow_headers=["*"],
             )
 
-    def _setup_routes(self):
+    def _setup_routes(self) -> None:
         @self.app.get("/")
-        def health():
+        def health() -> Dict[str, str]:
             if self.file_manager.modified_files_exist():
                 return {"message": "Files have been modified."}
             if not Path(CHUNKS_CACHE_FILE).is_file():
@@ -50,7 +52,8 @@ class LocalAPI:
         @self.app.get("/index")
         def index(data_dir: str = DATA_DIR,
                   max_chunk_size: int = 2000,
-                  force: bool = True, embed: bool = False):
+                  force: bool = True, embed: bool = False
+                  ) -> Dict[str, str]:
             if not self.file_manager.get_files():
                 return {"message": "No files found to index."}
 
@@ -62,27 +65,36 @@ class LocalAPI:
             return {"message": "Indexing completed successfully."}
 
         @self.app.post("/search")
-        def search(query: str, k: int = 10, hybrid: bool = False):
+        def search(query: str, k: int = 10,
+                   hybrid: bool = False) -> Dict[str, Any]:
             self.cli = self._cli()
             if hybrid:
                 results = self.cli.hybrid_search(query=query, k=k, p=False)
             else:
                 results = self.cli.search(query=query, k=k, p=False)
+
+            if results is None:
+                return {"message": "No search results found."}
             ss_results = StudentSearchResults(search_results=[results], k=k)
             dict_results = self._cleanup(ss_results)
             return dict_results
 
         @self.app.post("/answer")
-        def answer(query: str, k: int = 10, hybrid: bool = False):
+        def answer(query: str, k: int = 10,
+                   hybrid: bool = False) -> Dict[str, Any]:
             self.cli = self._cli()
             if hybrid:
                 results = self.cli.hybrid_answer(query=query, k=k, p=False)
             else:
                 results = self.cli.answer(query=query, k=k, p=False)
+            if results is None:
+                return {"message": "No answer found."}
             dict_results = self._cleanup(results)
             return dict_results
 
-    def _cleanup(self, results: StudentSearchResults) -> dict:
+    def _cleanup(self,
+                 results: StudentSearchResults | StudentSearchResultsAndAnswer
+                 ) -> Dict[str, Any]:
         dict_results = results.model_dump()
         for result in dict_results["search_results"]:
             for source in result["retrieved_sources"]:

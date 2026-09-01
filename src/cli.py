@@ -1,6 +1,7 @@
 import json
 import os
-from tqdm import tqdm  # type: ignore[import-untyped]
+from typing import List
+from tqdm import tqdm
 
 from src.models import (
     MinimalSearchResults,
@@ -13,20 +14,21 @@ from .retrieval import BM25Retrieval, HybridRetrieval
 from .indexer import Indexer
 from .llm_model import LLModel
 from .evaluator import Evaluator
+from .chunker import Chunk
 from .tools import _safe
 
 
 class CLI:
-    def __init__(self):
-        self.chunks = []
+    def __init__(self) -> None:
+        self.chunks: List[Chunk] = []
         self.evaluator = Evaluator()
         self.llm = LLModel()
-        self.hybrid = None
+        self.hybrid: HybridRetrieval | None = None
         self.index(force=False, embed=False, max_chunk_size=2000)
 
         self.bm25 = BM25Retrieval(self.chunks)
 
-    def _hybrid(self):
+    def _hybrid(self) -> HybridRetrieval:
         if self.hybrid is None:
             self.hybrid = HybridRetrieval(self.chunks)
         return self.hybrid
@@ -34,8 +36,8 @@ class CLI:
     @_safe
     def index(self,
               data_dir: str = "data/raw",
-              force=False,
-              embed=False,
+              force: bool = False,
+              embed: bool = False,
               max_chunk_size: int = 2000) -> None:
         """Build or load the document index."""
         indexer = Indexer(data_dir=data_dir, max_chunk_size=max_chunk_size)
@@ -70,7 +72,7 @@ class CLI:
     @_safe
     def search_dataset(
             self, dataset_path: str,
-            k: int, save_directory: str):
+            k: int, save_directory: str) -> None:
         """Run retrieval for every question in a dataset and save JSON."""
 
         with open(dataset_path, "r") as f:
@@ -133,7 +135,7 @@ class CLI:
     @_safe
     def answer_dataset(self,
                        student_search_results_path: str,
-                       save_directory: str):
+                       save_directory: str) -> None:
         """Generate answers for a saved search-results dataset."""
         with open(student_search_results_path, "r") as f:
             questions = json.load(f)
@@ -179,7 +181,7 @@ class CLI:
     @_safe
     def evaluate(self,
                  student_search_results_path: str,
-                 dataset_path: str):
+                 dataset_path: str) -> None:
         """Print recall for student search results against ground truth."""
         try:
             recall = self.evaluator.evaluate(

@@ -1,5 +1,5 @@
 from functools import wraps
-from typing import Any, Callable, List, TypeVar, cast
+from typing import Any, Callable, Dict, List, TypeVar, cast
 import json
 from .models import MinimalSource
 
@@ -31,9 +31,9 @@ def get_keywords_args(file_path: str,
                       last_character_index: int,
                       content: str = "",
                       file_type: str = "",
-                      metadata: dict = {},
+                      metadata: Dict[str, Any] = {},
                       score: float = 0.0
-                      ) -> dict:
+                      ) -> Dict[str, Any]:
     return {
         "file_path": file_path,
         "first_character_index": first_character_index,

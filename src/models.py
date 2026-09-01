@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List
+from typing import Any, List, Dict
 import uuid
 
 
@@ -9,7 +9,7 @@ class MinimalSource(BaseModel):
     last_character_index: int
     content: str = ""
     file_type: str = ""
-    metadata: dict = {}
+    metadata: Dict[str, Any] = {}
     score: float = 0.0
 
 

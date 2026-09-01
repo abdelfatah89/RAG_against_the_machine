@@ -1,7 +1,7 @@
-from typing import List, Tuple
+from typing import Any, List, Tuple, Dict
 from abc import ABC, abstractmethod
 from pathlib import Path
-from tqdm import tqdm  # type: ignore[import-untyped]
+from tqdm import tqdm
 
 from .models import MinimalSource
 from .file_manager import FileManager
@@ -17,7 +17,7 @@ class Chunk(MinimalSource):
     last_character_index: int
     content: str = ""
     file_type: str = ""
-    metadata: dict = {}
+    metadata: Dict[str, Any] = {}
     score: float = 0.0
 
 
