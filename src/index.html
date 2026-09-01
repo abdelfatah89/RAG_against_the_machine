@@ -85,6 +85,26 @@
   .dot.warn { background: var(--ochre); }
   .dot.bad { background: var(--rust); }
 
+  .recheck-btn {
+    font-size: 0.95rem;
+    line-height: 1;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid var(--rule);
+    border-radius: 50%;
+    background: var(--card);
+    color: var(--ink-soft);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.4s ease, color 0.2s ease, border-color 0.2s ease;
+  }
+  .recheck-btn:hover { color: var(--ink); border-color: var(--ink-soft); }
+  .recheck-btn.spinning { animation: spin 0.6s linear; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
   .endpoint-row {
     display: flex;
     justify-content: space-between;
@@ -340,6 +360,7 @@
     <div class="status">
       <span class="dot" id="statusDot"></span>
       <span id="statusText">checking connection…</span>
+      <button class="recheck-btn" id="recheckBtn" title="Recheck file health" aria-label="Recheck file health">↻</button>
     </div>
   </header>
 
@@ -461,6 +482,14 @@
   checkStatus();
   $('baseUrl').addEventListener('change', checkStatus);
   setInterval(checkStatus, 15000);
+
+  $('recheckBtn').addEventListener('click', () => {
+    const btn = $('recheckBtn');
+    btn.classList.remove('spinning');
+    void btn.offsetWidth; // restart animation if clicked again mid-spin
+    btn.classList.add('spinning');
+    checkStatus();
+  });
 
   // --- run index ---
   $('runIndex').addEventListener('click', async () => {
