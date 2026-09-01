@@ -10,6 +10,10 @@ debug:
 clean:
 	rm -rf */*.pyc */__pycache__/ .mypy_cache/
 
+fclean: clean
+	rm -rf data/output/search_results/*
+	rm -rf data/processed/*
+
 index:
 	@uv run python -m src index --max_chunk_size=2000 --force True
 
@@ -51,6 +55,9 @@ moulinette-docs-public:
 	data/output/search_results/dataset_docs_public.json \
 	data/datasets/AnsweredQuestions/dataset_docs_public.json \
 	--k 10
+
+start-local-api:
+	@uv run python -m src.local_api
 
 lint:
 lint-strict:

@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Local Index — Catalog</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #ECE7D9;
+    --card: #F8F5EA;
+    --ink: #23291F;
+    --ink-soft: #5B5A4C;
+    --rule: #C7BEA6;
+    --blue: #2F4858;
+    --blue-dim: #4A6577;
+    --ochre: #9C6B30;
+    --green: #46664B;
+    --rust: #8C3B2E;
+    --radius: 3px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    background-image:
+      repeating-linear-gradient(0deg, rgba(0,0,0,0.015) 0px, rgba(0,0,0,0.015) 1px, transparent 1px, transparent 32px);
+    color: var(--ink);
+    font-family: 'Public Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 48px 24px 96px;
+  }
+
+  header.masthead {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 18px;
+    margin-bottom: 6px;
+  }
+
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 2.6rem;
+    letter-spacing: -0.01em;
+    margin: 0;
+    line-height: 1;
+  }
+
+  .masthead p {
+    font-size: 0.9rem;
+    color: var(--ink-soft);
+    margin: 6px 0 0;
+    max-width: 40ch;
+  }
+
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.82rem;
+    color: var(--ink-soft);
+    white-space: nowrap;
+    padding-bottom: 4px;
+  }
+
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--rule);
+    transition: background 0.2s ease;
+  }
+  .dot.ok { background: var(--green); }
+  .dot.warn { background: var(--ochre); }
+  .dot.bad { background: var(--rust); }
+
+  .endpoint-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0 28px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 32px;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .endpoint-row label {
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+  }
+
+  .endpoint-row input {
+    font-family: 'Public Sans', sans-serif;
+    font-size: 0.85rem;
+    padding: 6px 8px;
+    border: 1px solid var(--rule);
+    background: var(--card);
+    border-radius: var(--radius);
+    color: var(--ink);
+    width: 240px;
+  }
+
+  /* --- Drawer tabs --- */
+  .drawers { display: flex; gap: 2px; margin-bottom: -1px; }
+
+  .drawer-tab {
+    font-family: 'Fraunces', serif;
+    font-size: 1rem;
+    font-weight: 500;
+    padding: 10px 22px 9px;
+    background: var(--rule);
+    color: var(--ink-soft);
+    border: none;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    cursor: pointer;
+    position: relative;
+    top: 1px;
+  }
+
+  .drawer-tab.active {
+    background: var(--card);
+    color: var(--ink);
+  }
+
+  .drawer-tab .idx {
+    font-size: 0.7rem;
+    color: var(--ochre);
+    margin-right: 6px;
+    font-family: 'Public Sans', sans-serif;
+  }
+
+  .drawer {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 0 6px 6px 6px;
+    padding: 28px 28px 26px;
+    display: none;
+  }
+  .drawer.active { display: block; }
+
+  .field-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px 20px;
+    margin-bottom: 20px;
+  }
+
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field.span2 { grid-column: 1 / -1; }
+
+  .field label {
+    font-size: 0.76rem;
+    text-transform: none;
+    color: var(--ink-soft);
+  }
+
+  .field input[type="text"],
+  .field input[type="number"] {
+    font-family: 'Public Sans', sans-serif;
+    font-size: 0.92rem;
+    padding: 9px 10px;
+    border: 1px solid var(--rule);
+    background: #fff;
+    border-radius: var(--radius);
+    color: var(--ink);
+  }
+
+  .field input:focus, .endpoint-row input:focus, .checkline input:focus {
+    outline: 2px solid var(--blue);
+    outline-offset: 1px;
+  }
+
+  .checkline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.88rem;
+  }
+
+  .checkline input { width: 16px; height: 16px; accent-color: var(--blue); }
+
+  .mode-toggle {
+    display: inline-flex;
+    border: 1px solid var(--ink);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 18px;
+  }
+  .mode-toggle button {
+    font-family: 'Public Sans', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 7px 16px;
+    border: none;
+    background: var(--card);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .mode-toggle button.active { background: var(--ink); color: var(--card); }
+  .mode-toggle button:not(:last-child) { border-right: 1px solid var(--ink); }
+
+  button.run {
+    font-family: 'Public Sans', sans-serif;
+    font-weight: 600;
+    font-size: 0.88rem;
+    padding: 10px 20px;
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+  }
+  button.run:hover { background: var(--blue-dim); }
+  button.run:disabled { background: var(--rule); cursor: default; }
+
+  .result-msg {
+    margin-top: 16px;
+    font-size: 0.88rem;
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    border-left: 3px solid var(--rule);
+    background: rgba(0,0,0,0.02);
+    display: none;
+  }
+  .result-msg.show { display: block; }
+  .result-msg.ok { border-left-color: var(--green); }
+  .result-msg.bad { border-left-color: var(--rust); color: var(--rust); }
+
+  /* --- Answer / results --- */
+  .answer-block {
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px dashed var(--rule);
+    display: none;
+  }
+  .answer-block.show { display: block; }
+
+  .answer-text {
+    font-family: 'Fraunces', serif;
+    font-size: 1.15rem;
+    line-height: 1.55;
+    margin: 0 0 20px;
+  }
+
+  .card-catalog { list-style: none; margin: 0; padding: 0; }
+
+  .catalog-entry {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    gap: 10px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .catalog-entry:last-child { border-bottom: none; }
+
+  .catalog-entry .tab-no {
+    font-family: 'Fraunces', serif;
+    font-size: 0.85rem;
+    color: var(--ochre);
+    padding-top: 2px;
+  }
+
+  .catalog-entry .entry-title {
+    font-weight: 600;
+    font-size: 0.92rem;
+    margin: 0 0 2px;
+  }
+
+  .catalog-entry .entry-meta {
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+    word-break: break-word;
+  }
+
+  .empty-note {
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    font-style: italic;
+    padding: 6px 0;
+  }
+
+  .raw-toggle {
+    margin-top: 16px;
+    font-size: 0.76rem;
+    color: var(--ink-soft);
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  pre.raw {
+    display: none;
+    margin-top: 10px;
+    background: #fff;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    padding: 12px;
+    font-size: 0.76rem;
+    overflow-x: auto;
+    white-space: pre-wrap;
+  }
+  pre.raw.show { display: block; }
+
+  @media (max-width: 640px) {
+    .field-grid { grid-template-columns: 1fr; }
+    header.masthead { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .endpoint-row { flex-direction: column; align-items: flex-start; }
+    .endpoint-row input { width: 100%; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <div>
+      <h1>Local Index</h1>
+      <p>A drawer for building and querying your document index.</p>
+    </div>
+    <div class="status">
+      <span class="dot" id="statusDot"></span>
+      <span id="statusText">checking connection…</span>
+    </div>
+  </header>
+
+  <div class="endpoint-row">
+    <div class="field">
+      <label for="baseUrl">API address</label>
+      <input type="text" id="baseUrl" value="http://localhost:8000" spellcheck="false">
+    </div>
+  </div>
+
+  <div class="drawers">
+    <button class="drawer-tab active" data-drawer="index"><span class="idx">01</span>Build index</button>
+    <button class="drawer-tab" data-drawer="ask"><span class="idx">02</span>Search &amp; answer</button>
+  </div>
+
+  <!-- ===== INDEX DRAWER ===== -->
+  <section class="drawer active" id="drawer-index">
+    <div class="field-grid">
+      <div class="field span2">
+        <label for="dataDir">Data directory</label>
+        <input type="text" id="dataDir" value="data/raw">
+      </div>
+      <div class="field">
+        <label for="maxChunk">Max chunk size</label>
+        <input type="number" id="maxChunk" value="2000" min="1">
+      </div>
+      <div class="field" style="justify-content:flex-end;">
+        <div class="checkline"><input type="checkbox" id="forceReindex" checked><label for="forceReindex">Force reindex</label></div>
+        <div class="checkline" style="margin-top:8px;"><input type="checkbox" id="embedChunks"><label for="embedChunks">Generate embeddings</label></div>
+      </div>
+    </div>
+    <button class="run" id="runIndex">Run index</button>
+    <div class="result-msg" id="indexMsg"></div>
+  </section>
+
+  <!-- ===== ASK DRAWER ===== -->
+  <section class="drawer" id="drawer-ask">
+    <div class="mode-toggle" role="group" aria-label="Query mode">
+      <button type="button" class="active" data-mode="search">Search</button>
+      <button type="button" data-mode="answer">Answer</button>
+    </div>
+
+    <div class="field-grid">
+      <div class="field span2">
+        <label for="queryInput">Query</label>
+        <input type="text" id="queryInput" placeholder="What do you want to find?">
+      </div>
+      <div class="field">
+        <label for="kInput">Results (k)</label>
+        <input type="number" id="kInput" value="10" min="1">
+      </div>
+      <div class="field" style="justify-content:flex-end;">
+        <div class="checkline"><input type="checkbox" id="hybridToggle"><label for="hybridToggle">Hybrid search</label></div>
+      </div>
+    </div>
+    <button class="run" id="runQuery">Run search</button>
+    <div class="result-msg" id="queryMsg"></div>
+
+    <div class="answer-block" id="answerBlock">
+      <p class="answer-text" id="answerText" style="display:none;"></p>
+      <ul class="card-catalog" id="catalogList"></ul>
+      <button class="raw-toggle" id="rawToggle">Show raw response</button>
+      <pre class="raw" id="rawOutput"></pre>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  function baseUrl() {
+    return $('baseUrl').value.replace(/\/$/, '');
+  }
+
+  // --- drawer tabs ---
+  document.querySelectorAll('.drawer-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.drawer-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.drawer').forEach(d => d.classList.remove('active'));
+      tab.classList.add('active');
+      $('drawer-' + tab.dataset.drawer).classList.add('active');
+    });
+  });
+
+  // --- mode toggle (search vs answer) ---
+  let mode = 'search';
+  document.querySelectorAll('.mode-toggle button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.mode-toggle button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      mode = btn.dataset.mode;
+      $('runQuery').textContent = mode === 'answer' ? 'Run answer' : 'Run search';
+    });
+  });
+
+  // --- connection status ---
+  async function checkStatus() {
+    const dot = $('statusDot');
+    const text = $('statusText');
+    try {
+      const res = await fetch(baseUrl() + '/');
+      if (!res.ok) throw new Error('bad response');
+      const data = await res.json();
+      const msg = data.message || 'connected';
+      if (/up-to-date|ready/i.test(msg)) {
+        dot.className = 'dot ok';
+      } else if (/modified|no processed/i.test(msg)) {
+        dot.className = 'dot warn';
+      } else {
+        dot.className = 'dot ok';
+      }
+      text.textContent = msg;
+    } catch (err) {
+      dot.className = 'dot bad';
+      text.textContent = 'cannot reach ' + baseUrl();
+    }
+  }
+  checkStatus();
+  $('baseUrl').addEventListener('change', checkStatus);
+  setInterval(checkStatus, 15000);
+
+  // --- run index ---
+  $('runIndex').addEventListener('click', async () => {
+    const btn = $('runIndex');
+    const msg = $('indexMsg');
+    btn.disabled = true;
+    btn.textContent = 'Indexing…';
+    msg.className = 'result-msg';
+    try {
+      const params = new URLSearchParams({
+        data_dir: $('dataDir').value,
+        max_chunk_size: $('maxChunk').value,
+        force: $('forceReindex').checked,
+        embed: $('embedChunks').checked
+      });
+      const res = await fetch(baseUrl() + '/index?' + params.toString());
+      const data = await res.json();
+      msg.textContent = data.message || 'Done.';
+      msg.classList.add('show', res.ok ? 'ok' : 'bad');
+    } catch (err) {
+      msg.textContent = 'Could not reach the API at ' + baseUrl() + '.';
+      msg.classList.add('show', 'bad');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Run index';
+      checkStatus();
+    }
+  });
+
+  // --- run search / answer ---
+  $('runQuery').addEventListener('click', async () => {
+    const query = $('queryInput').value.trim();
+    const btn = $('runQuery');
+    const msg = $('queryMsg');
+    const answerBlock = $('answerBlock');
+    const answerText = $('answerText');
+    const catalogList = $('catalogList');
+    const rawOutput = $('rawOutput');
+
+    msg.className = 'result-msg';
+    answerBlock.classList.remove('show');
+    answerText.style.display = 'none';
+    catalogList.innerHTML = '';
+    rawOutput.textContent = '';
+    rawOutput.classList.remove('show');
+    $('rawToggle').textContent = 'Show raw response';
+
+    if (!query) {
+      msg.textContent = 'Type a query first.';
+      msg.classList.add('show', 'bad');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Working…';
+
+    try {
+      const params = new URLSearchParams({
+        query: query,
+        k: $('kInput').value,
+        hybrid: $('hybridToggle').checked
+      });
+      const path = mode === 'answer' ? '/answer' : '/search';
+      const res = await fetch(baseUrl() + path + '?' + params.toString(), { method: 'POST' });
+      const data = await res.json();
+
+      if (!res.ok) {
+        msg.textContent = data.detail ? JSON.stringify(data.detail) : 'The API returned an error.';
+        msg.classList.add('show', 'bad');
+        return;
+      }
+
+      rawOutput.textContent = JSON.stringify(data, null, 2);
+      renderResults(data);
+      answerBlock.classList.add('show');
+    } catch (err) {
+      msg.textContent = 'Could not reach the API at ' + baseUrl() + '.';
+      msg.classList.add('show', 'bad');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = mode === 'answer' ? 'Run answer' : 'Run search';
+    }
+  });
+
+  function renderResults(data) {
+    const answerText = $('answerText');
+    const catalogList = $('catalogList');
+
+    // answer text can be top-level (older shape) or nested inside each
+    // search_results entry (current shape, one per question asked)
+    let answers = [];
+    if (data.answer) answers.push(data.answer);
+    if (Array.isArray(data.search_results)) {
+      data.search_results.forEach(sr => {
+        if (sr.answer) answers.push(sr.answer);
+      });
+    }
+    if (answers.length) {
+      answerText.textContent = answers.join('\n\n');
+      answerText.style.display = 'block';
+    }
+
+    // gather sources from search_results[*].retrieved_sources
+    let sources = [];
+    if (Array.isArray(data.search_results)) {
+      data.search_results.forEach(sr => {
+        if (Array.isArray(sr.retrieved_sources)) sources = sources.concat(sr.retrieved_sources);
+      });
+    } else if (Array.isArray(data.retrieved_sources)) {
+      sources = data.retrieved_sources;
+    }
+
+    if (sources.length === 0) {
+      const li = document.createElement('li');
+      li.className = 'empty-note';
+      li.textContent = data.answer ? 'No sources were listed for this answer.' : 'No results found.';
+      catalogList.appendChild(li);
+      return;
+    }
+
+    sources.forEach((src, i) => {
+      const li = document.createElement('li');
+      li.className = 'catalog-entry';
+
+      const num = document.createElement('span');
+      num.className = 'tab-no';
+      num.textContent = String(i + 1).padStart(2, '0');
+
+      const body = document.createElement('div');
+      const title = document.createElement('p');
+      title.className = 'entry-title';
+      title.textContent = src.title || src.filename || src.source || src.id || ('Source ' + (i + 1));
+
+      const meta = document.createElement('p');
+      meta.className = 'entry-meta';
+      const metaBits = Object.entries(src)
+        .filter(([k]) => !['title', 'filename', 'source', 'id'].includes(k))
+        .map(([k, v]) => k + ': ' + (typeof v === 'object' ? JSON.stringify(v) : v));
+      meta.textContent = metaBits.join(' · ');
+
+      body.appendChild(title);
+      if (metaBits.length) body.appendChild(meta);
+      li.appendChild(num);
+      li.appendChild(body);
+      catalogList.appendChild(li);
+    });
+  }
+
+  $('rawToggle').addEventListener('click', () => {
+    const pre = $('rawOutput');
+    pre.classList.toggle('show');
+    $('rawToggle').textContent = pre.classList.contains('show') ? 'Hide raw response' : 'Show raw response';
+  });
+
+  document.querySelectorAll('input').forEach(el => {
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        if (['dataDir', 'maxChunk'].includes(el.id)) $('runIndex').click();
+        if (['queryInput', 'kInput'].includes(el.id)) $('runQuery').click();
+      }
+    });
+  });
+</script>
+</body>
+</html>

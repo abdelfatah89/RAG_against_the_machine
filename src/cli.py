@@ -21,17 +21,24 @@ class CLI:
         self.chunks = []
         self.evaluator = Evaluator()
         self.llm = LLModel()
+        self.hybrid = None
         self.index(force=False, embed=False, max_chunk_size=2000)
 
         self.bm25 = BM25Retrieval(self.chunks)
 
+    def _hybrid(self):
+        if self.hybrid is None:
+            self.hybrid = HybridRetrieval(self.chunks)
+        return self.hybrid
+
     @_safe
     def index(self,
+              data_dir: str = "data/raw",
               force=False,
               embed=False,
               max_chunk_size: int = 2000) -> None:
         """Build or load the document index."""
-        indexer = Indexer(max_chunk_size=max_chunk_size)
+        indexer = Indexer(data_dir=data_dir, max_chunk_size=max_chunk_size)
         chunks = indexer.run(force, embed)
         self.chunks = chunks
 
@@ -198,8 +205,8 @@ class CLI:
         else:
             question = UnansweredQuestion(question=query)
 
-        hybrid = HybridRetrieval(self.chunks)
-        results = hybrid.retrieve(
+        self.hybrid = self._hybrid()
+        results = self.hybrid.retrieve(
             question.question,
             k,
             bm25_factor=bm25_factor,
