@@ -1,3 +1,9 @@
+.PHONY: run install debug clean fclean start-local-api lint lint-strict \
+		index \
+		search-private search-public \
+		moulinette-code-private moulinette-code-public \
+		moulinette-docs-private moulinette-docs-public
+
 run:
 	uv run python -m src
 
@@ -14,6 +20,19 @@ fclean: clean
 	rm -rf data/output/search_results/*
 	rm -rf data/processed/*
 
+start-local-api:
+	@uv run python -m src.local_api
+
+lint:
+	uv run flake8 .
+	uv run mypy --warn-return-any \
+	--warn-unused-ignores --disallow-untyped-defs --check-untyped-defs
+
+lint-strict:
+	uv run flake8 .
+	uv run mypy . --strict
+
+# Test Commands
 index:
 	@uv run python -m src index --max_chunk_size=2000 --force True
 
@@ -55,15 +74,3 @@ moulinette-docs-public:
 	data/output/search_results/dataset_docs_public.json \
 	data/datasets/AnsweredQuestions/dataset_docs_public.json \
 	--k 10
-
-start-local-api:
-	@uv run python -m src.local_api
-
-lint:
-	uv run flake8 .
-	uv run mypy --warn-return-any \
-	--warn-unused-ignores --disallow-untyped-defs --check-untyped-defs
-
-lint-strict:
-	uv run flake8 .
-	uv run mypy . --strict

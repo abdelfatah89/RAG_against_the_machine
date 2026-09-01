@@ -12,3 +12,6 @@ moulinette
 .trash/
 .test/
 data/*/*
+
+
+!data/*/.gitkeep
