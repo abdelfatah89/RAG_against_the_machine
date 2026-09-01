@@ -14,11 +14,12 @@ debug:
 	uv run python -m pdb src
 
 clean:
-	rm -rf */*.pyc */__pycache__/ .mypy_cache/
+	rm -rf */*.pyc */__pycache__/ .mypy_cache/ __pycache__/
 
 fclean: clean
 	rm -rf data/output/search_results/*
 	rm -rf data/processed/*
+	rm -rf chromadb
 
 start-local-api:
 	@uv run python -m src.local_api
