@@ -2,7 +2,6 @@ from typing import Any, Dict
 
 import uvicorn
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 
 from .models import StudentSearchResults, StudentSearchResultsAndAnswer
@@ -19,7 +18,6 @@ class LocalAPI:
         self.app = FastAPI()
         self.file_manager = FileManager(DATA_DIR)
         self.cli: CLI | None = None
-        self._setup_cors()
         self._setup_routes()
 
     def run(self) -> None:
@@ -29,15 +27,6 @@ class LocalAPI:
         if self.cli is None:
             self.cli = CLI()
         return self.cli
-
-    def _setup_cors(self) -> None:
-        self.app.add_middleware(
-            CORSMiddleware,
-            allow_origins=["*"],
-            allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
-            )
 
     def _setup_routes(self) -> None:
         @self.app.get("/")
@@ -49,7 +38,7 @@ class LocalAPI:
                                    "Please run the index command."}
             return {"message": "Chunks are ready and up-to-date."}
 
-        @self.app.get("/index")
+        @self.app.post("/index")
         def index(data_dir: str = DATA_DIR,
                   max_chunk_size: int = 2000,
                   force: bool = True, embed: bool = False
