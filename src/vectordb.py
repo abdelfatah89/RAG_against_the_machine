@@ -15,9 +15,7 @@ class VectorDB:
                  path: str = "chromadb",
                  collection_name: str = "chunks"):
         self.collection_name = collection_name
-        self.client = chromadb.PersistentClient(  # type: ignore[attr-defined]
-            path=path
-        )
+        self.client = chromadb.PersistentClient(path=path)
         self.collection = self.client.get_or_create_collection(collection_name)
 
     @staticmethod

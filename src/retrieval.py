@@ -76,9 +76,7 @@ class BM25Retrieval(Retrieval):
 class EmbeddingRetrieval(Retrieval):
     def __init__(self, chunks: List[Chunk]) -> None:
         super().__init__(chunks)
-        self.client = chromadb.PersistentClient(  # type: ignore[attr-defined]
-            path="chromadb"
-        )
+        self.client = chromadb.PersistentClient(path="chromadb")
         self.collection = self.client.get_or_create_collection("chunks")
 
     def retrieve(self, query: str, k: int = 3) -> List[MinimalSource]:
